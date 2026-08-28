@@ -45,7 +45,11 @@ export function adfToText(value: unknown): string {
     if (node.type === "hardBreak") return "\n";
     const text = (node.content ?? []).map(read).join("");
     if (node.type === "listItem") return `- ${text.trim()}`;
-    if (node.type === "bulletList" || node.type === "orderedList") return (node.content ?? []).map(read).join("\n");
+    if (node.type === "bulletList") return (node.content ?? []).map(read).join("\n");
+    if (node.type === "orderedList") {
+      const order = typeof node.attrs?.order === "number" && Number.isFinite(node.attrs.order) ? node.attrs.order : 1;
+      return (node.content ?? []).map((item, index) => `${order + index}. ${read(item).replace(/^- /, "")}`).join("\n");
+    }
     return text;
   };
   return document.content.map(read).map((text) => text.trim()).filter(Boolean).join("\n\n");

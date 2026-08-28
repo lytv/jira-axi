@@ -116,13 +116,14 @@ function sitesFrom(value: unknown): ImportedSite[] {
     Object.values(record).forEach((child) => walk(child, oauth));
   };
   walk(value);
-  return [...new Map(sites.filter((site) => site.email).map((site) => [`${site.baseUrl}|${site.email}`, site])).values()];
+  return sites.filter((site) => site.email);
 }
 
 export async function importAccounts(tool: "acli" | "jira-cli", sourcePath: string, existing: Account[], tokenEnv?: string): Promise<Account[]> {
   const source = load(await readFile(sourcePath, "utf8"));
-  const sites = sitesFrom(source);
-  if (sites.some((site) => site.oauth)) throw usage("OAuth credentials cannot import as Jira Basic API tokens", ["Use accounts add with --token-env <VAR>"]);
+  const found = sitesFrom(source);
+  if (found.some((site) => site.oauth)) throw usage("OAuth credentials cannot import as Jira Basic API tokens", ["Use accounts add with --token-env <VAR>"]);
+  const sites = [...new Map(found.map((site) => [`${site.baseUrl}|${site.email}`, site])).values()];
   if (sites.length === 0) throw usage(`No Jira Cloud site found in ${sourcePath}`);
   const multiple = sites.length > 1;
   const ids = new Set(existing.map((account) => account.id));

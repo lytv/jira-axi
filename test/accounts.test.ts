@@ -35,6 +35,11 @@ describe("accounts", () => {
     await writeFile(fixture, "authType: oauth\nsites:\n  - url: https://one.atlassian.net\n    email: one@example.com\n");
     await expect(importAccounts("acli", fixture, [])).rejects.toThrow("OAuth credentials");
   });
+  it("rejects an OAuth duplicate before it de-duplicates sites", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "jra-axi-")); const fixture = join(directory, "config.yml");
+    await writeFile(fixture, "sites:\n  - url: https://one.atlassian.net\n    email: one@example.com\n    authType: oauth\n  - url: https://one.atlassian.net\n    email: one@example.com\n");
+    await expect(importAccounts("acli", fixture, [])).rejects.toThrow("OAuth credentials");
+  });
   it("rejects nested raw tokens before writing account config", async () => {
     const directory = await mkdtemp(join(tmpdir(), "jra-axi-"));
     await expect(writeAccounts([{ ...account("one"), tokenSource: { kind: "env", ref: "TOKEN", nested: { token: "secret" } } } as Account], join(directory, "accounts.json"))).rejects.toThrow("raw token");
