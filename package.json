@@ -10,7 +10,7 @@
   },
   "license": "MIT",
   "bin": {
-    "jra-axi": "./dist/bin/jra-axi.js"
+    "jra-axi": "dist/bin/jra-axi.js"
   },
   "exports": {
     ".": {
@@ -29,7 +29,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc && node -e \"require('node:fs').copyFileSync('package.json', 'dist/package.json')\"",
+    "build": "tsc && node -e \"require('node:fs').copyFileSync('package.json', 'dist/package.json'); require('node:fs').chmodSync('dist/bin/jra-axi.js', 0o755)\"",
     "build:skill": "tsx scripts/build-skill.ts",
     "test": "pnpm run build && vitest run",
     "dev": "tsx bin/jra-axi.ts",
