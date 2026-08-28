@@ -167,9 +167,9 @@ describe("issues list", () => {
     expect(result.issues).toBe(
       '0 results for JQL "(project = EMPTY)" on account work',
     );
-    expect(calls.some((call) => call.path === "/search/approximate-count")).toBe(
-      false,
-    );
+    expect(
+      calls.some((call) => call.path === "/search/approximate-count"),
+    ).toBe(false);
   });
 });
 

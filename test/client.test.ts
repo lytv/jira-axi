@@ -80,12 +80,11 @@ describe("JiraClient", () => {
       },
     });
     const result = await client.searchJql("project = AXI", ["summary"], 50, 2);
-    expect(result.issues.map((issue) => issue.key)).toEqual([
-      "AXI-1",
-      "AXI-2",
-    ]);
+    expect(result.issues.map((issue) => issue.key)).toEqual(["AXI-1", "AXI-2"]);
     expect(result.nextPageToken).toBe("page-2");
-    const searchCalls = calls.filter((call) => call.url.includes("/search/jql"));
+    const searchCalls = calls.filter((call) =>
+      call.url.includes("/search/jql"),
+    );
     expect(searchCalls).toHaveLength(1);
     expect(searchCalls[0].body).toMatchObject({ maxResults: 2 });
   });
@@ -116,11 +115,10 @@ describe("JiraClient", () => {
       },
     });
     const result = await client.searchJql("project = AXI", ["summary"], 1, 2);
-    expect(result.issues.map((issue) => issue.key)).toEqual([
-      "AXI-1",
-      "AXI-2",
-    ]);
-    const searchCalls = calls.filter((call) => call.url.includes("/search/jql"));
+    expect(result.issues.map((issue) => issue.key)).toEqual(["AXI-1", "AXI-2"]);
+    const searchCalls = calls.filter((call) =>
+      call.url.includes("/search/jql"),
+    );
     expect(searchCalls).toHaveLength(2);
     expect(searchCalls[0].body).toMatchObject({ maxResults: 1 });
     expect(searchCalls[1].body).toMatchObject({ maxResults: 1 });

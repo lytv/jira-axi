@@ -118,7 +118,8 @@ export class JiraClient {
     const issues: JiraIssue[] = [];
     let nextPageToken: string | undefined;
     do {
-      const remaining = limit === undefined ? maxResults : limit - issues.length;
+      const remaining =
+        limit === undefined ? maxResults : limit - issues.length;
       const page = (await this.rest("/search/jql", {
         method: "POST",
         body: {
