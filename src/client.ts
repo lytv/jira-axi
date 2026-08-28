@@ -144,6 +144,7 @@ export class JiraClient {
     path: string,
     api: ApiKind = "rest",
     maxResults = 50,
+    query: Record<string, string | number | undefined> = {},
   ): Promise<T[]> {
     if (api === "rest" && path !== "/project") {
       throw new JiraClientError(
@@ -154,7 +155,7 @@ export class JiraClient {
     for (let startAt = 0; ; startAt += maxResults) {
       const page = (await this.request(path, {
         api,
-        query: { startAt, maxResults },
+        query: { ...query, startAt, maxResults },
       })) as { values?: T[]; isLast?: boolean; total?: number };
       const pageValues = page.values ?? [];
       values.push(...pageValues);
