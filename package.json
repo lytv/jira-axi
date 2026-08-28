@@ -21,6 +21,7 @@
   "types": "./dist/src/index.d.ts",
   "files": [
     "dist",
+    "skills/jra-axi",
     "LICENSE",
     "README.md"
   ],
@@ -29,9 +30,10 @@
   },
   "scripts": {
     "build": "tsc && node -e \"require('node:fs').copyFileSync('package.json', 'dist/package.json')\"",
+    "build:skill": "tsx scripts/build-skill.ts",
     "test": "pnpm run build && vitest run",
     "dev": "tsx bin/jra-axi.ts",
-    "lint": "eslint bin src test",
+    "lint": "eslint bin src test scripts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepublishOnly": "pnpm run build"

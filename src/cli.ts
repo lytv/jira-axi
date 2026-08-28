@@ -7,25 +7,29 @@ import {
   sprintsCommand,
   SPRINTS_HELP,
 } from "./commands/boards.js";
+import { homeCommand, HOME_HELP } from "./commands/home.js";
 import { issuesCommand } from "./commands/issues.js";
 import { projectsCommand, PROJECTS_HELP } from "./commands/projects.js";
+import { setupCommand, SETUP_HELP } from "./commands/setup.js";
 import { usersCommand, USERS_HELP } from "./commands/users.js";
 import { VERSION } from "./version.js";
 
 export const DESCRIPTION = "Manage Jira Cloud resources for agents.";
 export const TOP_HELP = `usage: jra-axi <command> [flags]
-commands[7]:
-  accounts, auth, issues, projects, boards, sprints, users
+commands[9]:
+  (none)=home, accounts, auth, issues, projects, boards, sprints, users, setup
 output:
-  Default output is TOON. Use --json on auth for JSON.
+  Default output is TOON. Use --json on auth and home for JSON.
   Use --tui on accounts for a human terminal dashboard.
 examples:
+  jra-axi
   jra-axi accounts add --id work --site example --email agent@example.com --token-env JIRA_API_TOKEN
   jra-axi accounts --tui
   jra-axi issues list --project AXI
   jra-axi issues view AXI-1
   jra-axi projects list --account work
   jra-axi sprints list --board 42 --state active
+  jra-axi setup hooks
 `;
 
 type MainOptions = {
@@ -53,26 +57,25 @@ export async function main(options: MainOptions = {}): Promise<void> {
       boards: boardsCommand,
       sprints: sprintsCommand,
       users: usersCommand,
+      home: (args) => homeCommand(args),
+      setup: (args) => setupCommand(args),
     },
-    home: async () => ({
-      help: [
-        "Run `jra-axi issues list` to search issues",
-        "Run `jra-axi accounts add --help` to add a Jira Cloud account",
-        "Run `jra-axi projects list` to list Jira projects",
-        "Run `jra-axi users whoami` to show the current Jira identity",
-      ],
-    }),
+    home: (args) => homeCommand(args),
     getCommandHelp: (command) =>
       command === "accounts" || command === "auth"
         ? TOP_HELP
-        : command === "projects"
-          ? PROJECTS_HELP
-          : command === "boards"
-            ? BOARDS_HELP
-            : command === "sprints"
-              ? SPRINTS_HELP
-              : command === "users"
-                ? USERS_HELP
-                : undefined,
+        : command === "home"
+          ? HOME_HELP
+          : command === "setup"
+            ? SETUP_HELP
+            : command === "projects"
+              ? PROJECTS_HELP
+              : command === "boards"
+                ? BOARDS_HELP
+                : command === "sprints"
+                  ? SPRINTS_HELP
+                  : command === "users"
+                    ? USERS_HELP
+                    : undefined,
   });
 }
