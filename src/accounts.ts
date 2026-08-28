@@ -4,6 +4,10 @@ import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { AxiError } from "axi-sdk-js";
 import { load } from "js-yaml";
+import { JiraClient } from "./client.js";
+import { detectTuiColor, renderAccountsTui } from "./tui.js";
+import { formatInterval, runLiveTui, type LiveTuiIo } from "./tui-live.js";
+import { loadTuiSummary, type TuiClient, type TuiSummary } from "./tui-data.js";
 import type { Account, TokenSourceKind } from "./types.js";
 
 export const accountsPath = (): string =>
@@ -330,10 +334,125 @@ function uniqueId(url: string, ids: Set<string>, index: number): string {
   return id;
 }
 
+const DEFAULT_TUI_REFRESH_SECONDS = 300;
+const MIN_TUI_REFRESH_SECONDS = 30;
+const MAX_TUI_REFRESH_SECONDS = 86_400;
+
+export type AccountsTuiOptions = {
+  readAccounts: () => Promise<Account[]>;
+  tokenForAccount: (account: Account) => Promise<string>;
+  createClient: (account: Account, token: string) => TuiClient;
+  isInteractive: () => boolean;
+  io: () => LiveTuiIo;
+  columns: () => number | undefined;
+  noColor: () => boolean;
+};
+
+const defaultTuiOptions: AccountsTuiOptions = {
+  readAccounts,
+  tokenForAccount,
+  createClient: (account, token) => new JiraClient(account, token),
+  isInteractive: () =>
+    process.stdout.isTTY === true && process.stdin.isTTY === true,
+  io: () => processLiveTuiIo(),
+  columns: () => process.stdout.columns,
+  noColor: () => !detectTuiColor(process.env, process.stdout.isTTY === true),
+};
+
+function processLiveTuiIo(): LiveTuiIo {
+  return {
+    stdout: process.stdout,
+    stdin: process.stdin,
+    setTimer: (callback, milliseconds) => setTimeout(callback, milliseconds),
+    clearTimer: (handle) => {
+      clearTimeout(handle as ReturnType<typeof setTimeout>);
+    },
+    onResize: (listener) => {
+      process.stdout.on("resize", listener);
+      return () => {
+        process.stdout.off("resize", listener);
+      };
+    },
+    onSignal: (listener) => {
+      const signals = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
+      for (const signal of signals) process.on(signal, listener);
+      return () => {
+        for (const signal of signals) process.off(signal, listener);
+      };
+    },
+  };
+}
+
+function parseRefreshValue(value: string | undefined): number {
+  const match = /^(\d{1,7})(s|m|h)?$/.exec(value?.trim() ?? "");
+  if (!match)
+    throw usage("--refresh requires a duration such as 30s, 5m, or 1h");
+  const multiplier = match[2] === "h" ? 3600 : match[2] === "m" ? 60 : 1;
+  const seconds = Number(match[1]) * multiplier;
+  if (seconds < MIN_TUI_REFRESH_SECONDS || seconds > MAX_TUI_REFRESH_SECONDS)
+    throw usage(
+      `--refresh must be between ${MIN_TUI_REFRESH_SECONDS}s and ${MAX_TUI_REFRESH_SECONDS / 3600}h`,
+    );
+  return seconds;
+}
+
+function parseTuiFlags(args: string[]): {
+  once: boolean;
+  refreshSeconds?: number;
+} {
+  if (args.includes("--json"))
+    throw usage("--tui and --json are mutually exclusive output modes");
+  const flags = flagMap(args);
+  onlyFlags(flags, ["--once", "--refresh"]);
+  const once = flags.has("--once");
+  const refreshFlag = flags.get("--refresh");
+  const refreshSeconds =
+    refreshFlag === undefined
+      ? undefined
+      : parseRefreshValue(refreshFlag === true ? undefined : refreshFlag);
+  if (once && refreshSeconds !== undefined)
+    throw usage("Use either --once or --refresh, not both");
+  return {
+    once,
+    ...(refreshSeconds === undefined ? {} : { refreshSeconds }),
+  };
+}
+
+export async function accountsTui(
+  args: string[],
+  options: AccountsTuiOptions = defaultTuiOptions,
+): Promise<string> {
+  const flags = parseTuiFlags(args);
+  const accounts = await options.readAccounts();
+  const dataDeps = {
+    tokenForAccount: options.tokenForAccount,
+    createClient: options.createClient,
+  };
+  const frame = (summary: TuiSummary, footerHint?: string): string =>
+    renderAccountsTui(summary, {
+      columns: options.columns(),
+      noColor: options.noColor(),
+      ...(footerHint === undefined ? {} : { footerHint }),
+    });
+  if (flags.once || !options.isInteractive()) {
+    return frame(await loadTuiSummary(accounts, dataDeps));
+  }
+  const refreshSeconds = flags.refreshSeconds ?? DEFAULT_TUI_REFRESH_SECONDS;
+  const hint = `Press q to quit · refreshing every ${formatInterval(refreshSeconds)}`;
+  const last = await runLiveTui<TuiSummary>({
+    load: () => loadTuiSummary(accounts, dataDeps),
+    render: (summary) => frame(summary, hint),
+    intervalMillis: refreshSeconds * 1000,
+    io: options.io(),
+  });
+  return last === undefined ? "" : frame(last);
+}
+
 export async function accountsCommand(
   args: string[],
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, unknown> | string> {
   const [subcommand, ...rest] = args;
+  if (subcommand === "--tui") return accountsTui(rest);
   if (subcommand === "list") {
     if (rest.length) throw usage("accounts list accepts no flags");
     return {

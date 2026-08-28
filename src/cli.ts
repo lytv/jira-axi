@@ -18,8 +18,10 @@ commands[7]:
   accounts, auth, issues, projects, boards, sprints, users
 output:
   Default output is TOON. Use --json on auth for JSON.
+  Use --tui on accounts for a human terminal dashboard.
 examples:
   jra-axi accounts add --id work --site example --email agent@example.com --token-env JIRA_API_TOKEN
+  jra-axi accounts --tui
   jra-axi issues list --project AXI
   jra-axi issues view AXI-1
   jra-axi projects list --account work
@@ -33,8 +35,12 @@ type MainOptions = {
 };
 
 export async function main(options: MainOptions = {}): Promise<void> {
+  const argv = options.argv ?? process.argv.slice(2);
+  // `jra-axi --tui` is an alias for `jra-axi accounts --tui`: the same human
+  // dashboard, reachable without naming the accounts command.
+  const routedArgv = argv[0] === "--tui" ? ["accounts", ...argv] : argv;
   await runAxiCli({
-    argv: options.argv ?? process.argv.slice(2),
+    argv: routedArgv,
     ...(options.stdout ? { stdout: options.stdout } : {}),
     description: DESCRIPTION,
     version: VERSION,
