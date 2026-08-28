@@ -73,6 +73,18 @@ function userRow(user: JiraUser): Record<string, unknown> {
   };
 }
 
+async function searchUsers(client: JiraClient, query: string): Promise<JiraUser[]> {
+  const maxResults = 50;
+  const users: JiraUser[] = [];
+  for (let startAt = 0; ; startAt += maxResults) {
+    const page = (await client.rest("/user/search", {
+      query: { query, startAt, maxResults },
+    })) as JiraUser[];
+    users.push(...page);
+    if (page.length < maxResults) return users;
+  }
+}
+
 export async function usersCommand(
   args: string[],
   options: UsersDependencies = dependencies,
@@ -95,9 +107,7 @@ export async function usersCommand(
       values.get("--account"),
       options,
     );
-    const users = (await client.rest("/user/search", {
-      query: { query },
-    })) as JiraUser[];
+    const users = await searchUsers(client, query);
     return users.length === 0
       ? {
           account: account.id,
