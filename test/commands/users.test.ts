@@ -57,6 +57,35 @@ describe("users", () => {
     expect(urls[0]).toContain("query=Taylor");
   });
 
+  it("paginates past the 50-result page cap instead of truncating", async () => {
+    const urls: string[] = [];
+    const totalMatches = 60;
+    const output = await usersCommand(
+      ["search", "--query", "Alex"],
+      commandOptions(async (input) => {
+        const requestUrl = new URL(String(input));
+        urls.push(requestUrl.toString());
+        const startAt = Number(requestUrl.searchParams.get("startAt") ?? 0);
+        const maxResults = Number(
+          requestUrl.searchParams.get("maxResults") ?? 50,
+        );
+        const page = Array.from(
+          { length: Math.max(0, Math.min(maxResults, totalMatches - startAt)) },
+          (_, index) => ({
+            accountId: `a-${startAt + index}`,
+            displayName: `Alex ${startAt + index}`,
+          }),
+        );
+        return response(page);
+      }),
+    );
+    expect(output).toMatchObject({ count: totalMatches });
+    expect((output.users as unknown[]).length).toBe(totalMatches);
+    expect(urls).toHaveLength(2);
+    expect(urls[0]).toContain("startAt=0");
+    expect(urls[1]).toContain("startAt=50");
+  });
+
   it("names the account when no user matches", async () => {
     const output = await usersCommand(
       ["search", "--query", "Taylor"],

@@ -73,7 +73,10 @@ function userRow(user: JiraUser): Record<string, unknown> {
   };
 }
 
-async function searchUsers(client: JiraClient, query: string): Promise<JiraUser[]> {
+async function searchUsers(
+  client: JiraClient,
+  query: string,
+): Promise<JiraUser[]> {
   const maxResults = 50;
   const users: JiraUser[] = [];
   for (let startAt = 0; ; startAt += maxResults) {
