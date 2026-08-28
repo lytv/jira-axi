@@ -13,6 +13,8 @@ pnpm add -g @lytv/jira-axi
 ```sh
 jra-axi accounts add --id work --site example --email agent@example.com --token-env JIRA_API_TOKEN
 jra-axi auth
+jra-axi issues list --project AXI
+jra-axi issues view AXI-1
 jra-axi projects list --account work
 jra-axi boards list --project ENG
 jra-axi sprints list --board 42 --state active
