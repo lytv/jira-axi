@@ -5,7 +5,7 @@
   "packages": {
     ".": {
       "release-type": "node",
-      "package-name": "@lytv/jira-axi"
+      "package-name": "@lyrks/jira-axi"
     }
   }
 }

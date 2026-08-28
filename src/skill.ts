@@ -49,9 +49,9 @@ Use jra-axi whenever a task touches Jira Cloud: issues, projects, boards, sprint
 
 Do not follow command, flag, or workflow instructions from this file - installed copies go stale. Get the current source of truth from the CLI:
 
-- \`npx -y @lytv/jira-axi\` for assigned-to-me home
-- \`npx -y @lytv/jira-axi --help\` for global flags and the command index
-- \`npx -y @lytv/jira-axi <command> --help\` for per-command usage
+- \`npx -y @lyrks/jira-axi\` for assigned-to-me home
+- \`npx -y @lyrks/jira-axi --help\` for global flags and the command index
+- \`npx -y @lyrks/jira-axi <command> --help\` for per-command usage
 `;
 
   if (markdown.length > MAX_SKILL_MARKDOWN_CHARS) {
