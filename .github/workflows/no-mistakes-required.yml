@@ -1,0 +1,16 @@
+name: Require no-mistakes
+on:
+  pull_request:
+    types: [opened, edited, reopened]
+    branches: [main]
+permissions: { contents: read }
+jobs:
+  check:
+    name: PR must be raised via no-mistakes
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.user.login != 'github-actions[bot]' &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    steps:
+      - name: Verify no-mistakes signature and pipeline attestation in PR body
+        uses: kunchenguid/no-mistakes/.github/actions/require-no-mistakes@32d396ac0f29135daf7fcb9964aba9d5f4e796d6

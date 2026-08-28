@@ -1,0 +1,29 @@
+name: Guard generated files
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths-ignore: [.release-please-manifest.json, CHANGELOG.md, package.json]
+permissions: { contents: read }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.user.login != 'github-actions[bot]' &&
+      github.event.pull_request.user.login != 'release-please[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Check generated files
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -eu
+          files=$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}")
+          for path in CHANGELOG.md .release-please-manifest.json; do
+            if printf '%s\n' "$files" | grep -qxF -- "$path" && git cat-file -e "${BASE_SHA}:${path}" 2>/dev/null; then
+              echo "::error::Do not modify generated file: $path"
+              exit 1
+            fi
+          done
