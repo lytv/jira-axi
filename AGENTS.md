@@ -16,6 +16,10 @@ Generate `skills/jra-axi/SKILL.md` with `pnpm run build:skill`. Do not hand-edit
 
 `jra-axi setup hooks` installs SessionStart hooks. See `src/commands/setup.ts`.
 
+v1 surface and the out-of-scope list live in `VISION.md`. Cloud only. No Data Center, Server, or OAuth 3LO.
+
+Releases are cut by release-please from conventional commits on `main`. Merging the bot release PR runs `npm publish --access public --provenance` in `.github/workflows/release-please.yml` via npm OIDC trusted publishing (`id-token: write`). Do not invent an `NPM_TOKEN`. Do not hand-edit `CHANGELOG.md` or `.release-please-manifest.json`.
+
 ## Maintaining this file
 
 Keep only durable project facts here. Link to source files when they define details. Remove facts that no longer apply.
