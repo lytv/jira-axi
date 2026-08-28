@@ -47,7 +47,7 @@ export class JiraClient {
       }
       if (response.status === 429 && attempt < 3) {
         const retryAfter = Number(response.headers.get("retry-after"));
-        await this.sleep(Math.min(Number.isFinite(retryAfter) ? retryAfter * 1000 : 500 * 2 ** attempt, 10_000));
+        await this.sleep(Math.min(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 500 * 2 ** attempt, 10_000));
         continue;
       }
       if (response.status === 429) throw new JiraClientError(`Jira rate limited ${path}`, ["Wait and retry this command"]);

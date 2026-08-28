@@ -12,7 +12,7 @@
   "files": ["dist", "LICENSE", "README.md"],
   "publishConfig": { "access": "public" },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"require('node:fs').copyFileSync('package.json', 'dist/package.json')\"",
     "test": "pnpm run build && vitest run",
     "dev": "tsx bin/jra-axi.ts",
     "lint": "eslint bin src test",

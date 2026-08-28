@@ -39,6 +39,15 @@ describe("JiraClient", () => {
     expect(calls).toBe(4); expect(sleeps).toEqual([2000, 2000, 2000]);
   });
 
+  it("uses capped backoff when Retry-After is missing or non-positive", async () => {
+    for (const header of [undefined, "0"]) {
+      const sleeps: number[] = [];
+      const client = new JiraClient(account, "token", { fetcher: async () => response({}, 429, header ? { "retry-after": header } : undefined), sleep: async (time) => { sleeps.push(time); } });
+      await expect(client.rest("/myself")).rejects.toThrow("Jira rate limited /myself");
+      expect(sleeps).toEqual([500, 1000, 2000]);
+    }
+  });
+
   it("retries a scoped token through the cloud ID path", async () => {
     const urls: string[] = [];
     const client = new JiraClient({ ...account, cloudId: "cloud-1" }, "token", { fetcher: async (input) => { urls.push(String(input)); return urls.length === 1 ? response({}, 401) : response({ accountId: "a" }); } });

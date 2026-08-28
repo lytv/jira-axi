@@ -11,11 +11,16 @@ type AccountsFile = { accounts: Account[] };
 
 function usage(message: string, suggestions: string[] = []): AxiError { return new AxiError(message, "VALIDATION_ERROR", suggestions); }
 
+function hasRawToken(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  return Object.entries(value).some(([key, child]) => (key !== "tokenSource" && key.toLowerCase().includes("token")) || hasRawToken(child));
+}
+
 function ensureAccount(value: unknown): Account {
   const account = value as Account;
   if (!account?.id || !account.baseUrl || !account.email || !account.tokenSource?.kind || !account.tokenSource.ref) throw usage("Account config has required fields missing");
   if (!(["env", "keychain", "file", "acli-ref", "jira-cli-ref"] as TokenSourceKind[]).includes(account.tokenSource.kind)) throw usage(`Unsupported token source for ${account.id}`);
-  if ("token" in (account as Record<string, unknown>)) throw usage(`Account ${account.id} stores a raw token`);
+  if (hasRawToken(account)) throw usage(`Account ${account.id} stores a raw token`);
   const url = new URL(account.baseUrl);
   if (url.protocol !== "https:" || url.hostname.endsWith(".atlassian.net") === false) throw usage(`Account ${account.id} is not a Jira Cloud site`);
   return { ...account, default: Boolean(account.default), deployment: "cloud", authScheme: "basic" };
@@ -96,19 +101,19 @@ function accountFromFlags(flags: Map<string, string | true>): Account {
 type ImportedSite = { baseUrl: string; email: string; project?: string; board?: string; oauth: boolean };
 function sitesFrom(value: unknown): ImportedSite[] {
   const sites: ImportedSite[] = [];
-  const walk = (item: unknown): void => {
-    if (Array.isArray(item)) { item.forEach(walk); return; }
+  const walk = (item: unknown, inheritedOAuth = false): void => {
+    if (Array.isArray(item)) { item.forEach((child) => walk(child, inheritedOAuth)); return; }
     if (!item || typeof item !== "object") return;
     const record = item as Record<string, unknown>;
+    const oauth = inheritedOAuth || Object.entries(record).some(([key, child]) => key.toLowerCase().includes("oauth") || (typeof child === "string" && child.toLowerCase().includes("oauth")));
     const rawUrl = [record.baseUrl, record.url, record.server, record.site].find((candidate): candidate is string => typeof candidate === "string" && candidate.includes("atlassian.net"));
     if (rawUrl) {
       const email = [record.email, record.username, record.login, record.user].find((candidate): candidate is string => typeof candidate === "string") ?? "";
       const project = typeof record.project === "string" ? record.project : typeof (record.project as Record<string, unknown> | undefined)?.key === "string" ? (record.project as Record<string, string>).key : undefined;
       const board = typeof record.board === "string" || typeof record.board === "number" ? String(record.board) : undefined;
-      const authentication = JSON.stringify(record).toLowerCase();
-      sites.push({ baseUrl: baseUrl(rawUrl), email, project, board, oauth: authentication.includes("oauth") });
+      sites.push({ baseUrl: baseUrl(rawUrl), email, project, board, oauth });
     }
-    Object.values(record).forEach(walk);
+    Object.values(record).forEach((child) => walk(child, oauth));
   };
   walk(value);
   return [...new Map(sites.filter((site) => site.email).map((site) => [`${site.baseUrl}|${site.email}`, site])).values()];
@@ -120,17 +125,22 @@ export async function importAccounts(tool: "acli" | "jira-cli", sourcePath: stri
   if (sites.some((site) => site.oauth)) throw usage("OAuth credentials cannot import as Jira Basic API tokens", ["Use accounts add with --token-env <VAR>"]);
   if (sites.length === 0) throw usage(`No Jira Cloud site found in ${sourcePath}`);
   const multiple = sites.length > 1;
-  const additions = sites.map((site, index) => ensureAccount({
-    id: uniqueId(site.baseUrl, existing.concat([]), index), baseUrl: site.baseUrl, email: site.email,
-    tokenSource: { kind: tool === "jira-cli" ? "jira-cli-ref" : "acli-ref", ref: tokenEnv ?? (tool === "jira-cli" ? "JIRA_API_TOKEN" : "ACLI_JIRA_API_TOKEN") },
-    default: !multiple && existing.length === 0 && index === 0, deployment: "cloud", authScheme: "basic", defaultProject: site.project, defaultBoardId: site.board,
-    importedFrom: { tool, path: sourcePath, importedAt: new Date().toISOString() },
-  }));
+  const ids = new Set(existing.map((account) => account.id));
+  const additions: Account[] = [];
+  for (const [index, site] of sites.entries()) {
+    const id = uniqueId(site.baseUrl, ids, index);
+    ids.add(id);
+    additions.push(ensureAccount({
+      id, baseUrl: site.baseUrl, email: site.email,
+      tokenSource: { kind: tool === "jira-cli" ? "jira-cli-ref" : "acli-ref", ref: tokenEnv ?? (tool === "jira-cli" ? "JIRA_API_TOKEN" : "ACLI_JIRA_API_TOKEN") },
+      default: !multiple && existing.length === 0 && index === 0, deployment: "cloud", authScheme: "basic", defaultProject: site.project, defaultBoardId: site.board,
+      importedFrom: { tool, path: sourcePath, importedAt: new Date().toISOString() },
+    }));
+  }
   return additions;
 }
-function uniqueId(url: string, existing: Account[], index: number): string {
+function uniqueId(url: string, ids: Set<string>, index: number): string {
   const seed = new URL(url).hostname.replace(".atlassian.net", "").replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "jira";
-  const ids = new Set(existing.map((account) => account.id));
   let id = index ? `${seed}-${index + 1}` : seed;
   for (let suffix = 2; ids.has(id); suffix++) id = `${seed}-${suffix}`;
   return id;
