@@ -1,0 +1,37 @@
+{
+  "name": "@lytv/jira-axi",
+  "version": "0.1.0",
+  "description": "AXI CLI for Jira Cloud",
+  "type": "module",
+  "packageManager": "pnpm@11.1.1",
+  "repository": { "type": "git", "url": "https://github.com/lytv/jira-axi.git" },
+  "license": "MIT",
+  "bin": { "jra-axi": "./dist/bin/jra-axi.js" },
+  "exports": { ".": { "types": "./dist/src/index.d.ts", "default": "./dist/src/index.js" } },
+  "types": "./dist/src/index.d.ts",
+  "files": ["dist", "LICENSE", "README.md"],
+  "publishConfig": { "access": "public" },
+  "scripts": {
+    "build": "tsc",
+    "test": "pnpm run build && vitest run",
+    "dev": "tsx bin/jra-axi.ts",
+    "lint": "eslint bin src test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepublishOnly": "pnpm run build"
+  },
+  "engines": { "node": ">=22.19" },
+  "dependencies": { "@toon-format/toon": "2.1.0", "axi-sdk-js": "^0.1.10", "js-yaml": "^4.1.1" },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "22.0.0",
+    "eslint": "10.1.0",
+    "globals": "17.7.0",
+    "prettier": "3.8.1",
+    "tsx": "4.23.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.58.0",
+    "vitest": "3.0.0"
+  }
+}
