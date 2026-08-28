@@ -196,6 +196,25 @@ describe("assignedSummaries", () => {
     });
   });
 
+  it("does not report a full fallback page as an exact count", async () => {
+    const fallbackIssues = Array.from({ length: 51 }, (_, index) =>
+      issue(`AXI-${index + 1}`, `Item ${index + 1}`, "To Do"),
+    );
+    const summaries = await assignedSummaries(
+      depsFor(
+        [account("work")],
+        { [ASSIGNED_JQL]: new Error("Approximate count unavailable") },
+        { [ASSIGNED_JQL]: fallbackIssues },
+        [],
+      ),
+    );
+    expect(summaries[0]).toMatchObject({
+      accountId: "work",
+      status: "unreachable",
+      assigned: 0,
+    });
+  });
+
   it("serializes per-account calls and does not fail the whole view on one error", async () => {
     const order: string[] = [];
     let inflight = 0;

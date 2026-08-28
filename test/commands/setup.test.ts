@@ -1,9 +1,18 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { AxiError, installSessionStartHooks } from "axi-sdk-js";
-import { setupCommand } from "../../src/commands/setup.js";
+import { AxiError } from "axi-sdk-js";
+import {
+  installCompactSessionStartHooks,
+  setupCommand,
+} from "../../src/commands/setup.js";
 
 async function snapshot(home: string): Promise<string> {
   const paths = [
@@ -64,14 +73,43 @@ describe("setup hooks", () => {
       shouldInstall: () => true,
     };
     await setupCommand(["hooks"], {
-      installHooks: () => installSessionStartHooks(options),
+      installHooks: () => installCompactSessionStartHooks(options),
     });
     const first = await snapshot(home);
     expect(first).toContain("jra-axi");
     expect(first).not.toContain("MISSING");
     await setupCommand(["hooks"], {
-      installHooks: () => installSessionStartHooks(options),
+      installHooks: () => installCompactSessionStartHooks(options),
     });
     expect(await snapshot(home)).toBe(first);
+  });
+
+  it("uses the PATH command with compact home arguments", async () => {
+    const home = await mkdtemp(join(tmpdir(), "jra-axi-hooks-"));
+    const execPath = join(home, "dist", "bin", "jra-axi.js");
+    const bin = join(home, "bin");
+    await mkdir(dirname(execPath), { recursive: true });
+    await mkdir(bin, { recursive: true });
+    await writeFile(execPath, "#!/usr/bin/env node\n");
+    await symlink(execPath, join(bin, "jra-axi"));
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${bin}:${originalPath ?? ""}`;
+    try {
+      installCompactSessionStartHooks({
+        marker: "jra-axi",
+        binaryNames: ["jra-axi"],
+        execPath,
+        homeDir: home,
+        shouldInstall: () => true,
+      });
+    } finally {
+      process.env.PATH = originalPath;
+    }
+    const settings = JSON.parse(
+      await readFile(join(home, ".claude", "settings.json"), "utf8"),
+    ) as { hooks: { SessionStart: { hooks: { command: string }[] }[] } };
+    expect(settings.hooks.SessionStart[0]?.hooks[0]?.command).toBe(
+      "jra-axi home --compact",
+    );
   });
 });

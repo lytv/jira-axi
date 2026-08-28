@@ -11,6 +11,7 @@ export const BLOCKED_JQL = `${ASSIGNED_JQL} AND (status = Blocked OR status = "B
 export const ASSIGNED_ISSUE_JQL = `${ASSIGNED_JQL} ORDER BY updated DESC`;
 const COUNT_FIELDS = ["key", "status", "duedate"];
 const ISSUE_FIELDS = ["summary", "status", "duedate"];
+const FALLBACK_COUNT_LIMIT = 50;
 
 export type AssignedIssue = {
   key: string;
@@ -69,7 +70,14 @@ async function countJql(client: AssignedClient, jql: string): Promise<number> {
   } catch {
     /* Fall back to a bounded search. */
   }
-  const { issues } = await client.searchJql(jql, COUNT_FIELDS, 50, 50);
+  const { issues } = await client.searchJql(
+    jql,
+    COUNT_FIELDS,
+    FALLBACK_COUNT_LIMIT,
+    FALLBACK_COUNT_LIMIT + 1,
+  );
+  if (issues.length > FALLBACK_COUNT_LIMIT)
+    throw new Error("Jira count exceeds the fallback limit");
   return issues.length;
 }
 
