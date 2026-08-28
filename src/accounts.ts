@@ -404,23 +404,16 @@ function parseTuiFlags(args: string[]): {
   once: boolean;
   refreshSeconds?: number;
 } {
-  let once = false;
-  let refreshSeconds: number | undefined;
-  for (let index = 0; index < args.length; index++) {
-    const arg = args[index];
-    if (arg === "--once") {
-      once = true;
-      continue;
-    }
-    if (arg === "--refresh") {
-      refreshSeconds = parseRefreshValue(args[index + 1]);
-      index++;
-      continue;
-    }
-    if (arg === "--json")
-      throw usage("--tui and --json are mutually exclusive output modes");
-    throw usage(`Unknown flag ${arg}`, ["Valid flags: --once, --refresh"]);
-  }
+  if (args.includes("--json"))
+    throw usage("--tui and --json are mutually exclusive output modes");
+  const flags = flagMap(args);
+  onlyFlags(flags, ["--once", "--refresh"]);
+  const once = flags.has("--once");
+  const refreshFlag = flags.get("--refresh");
+  const refreshSeconds =
+    refreshFlag === undefined
+      ? undefined
+      : parseRefreshValue(refreshFlag === true ? undefined : refreshFlag);
   if (once && refreshSeconds !== undefined)
     throw usage("Use either --once or --refresh, not both");
   return {

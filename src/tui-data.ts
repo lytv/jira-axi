@@ -49,11 +49,16 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function isUnknownStatusError(message: string): boolean {
+  return /does not exist/i.test(message) && /\bstatus\b/i.test(message);
+}
+
 async function safeCount(client: TuiClient, jql: string): Promise<number> {
   try {
     return (await client.approximateSearchCount(jql)) ?? 0;
-  } catch {
-    return 0;
+  } catch (error) {
+    if (isUnknownStatusError(messageOf(error))) return 0;
+    throw error;
   }
 }
 
@@ -106,31 +111,42 @@ async function loadAccountSummary(
       detail: message,
     };
   }
-  const assigned = await safeCount(client, `${MINE} AND resolution = Unresolved`);
-  const overdue = await safeCount(
-    client,
-    `${MINE} AND resolution = Unresolved AND duedate < now()`,
-  );
-  const inReview = await safeCount(
-    client,
-    `${MINE} AND resolution = Unresolved AND (status = "In Review" OR status = "Review")`,
-  );
-  const blocked = await safeCount(
-    client,
-    `${MINE} AND resolution = Unresolved AND status = Blocked`,
-  );
-  const sprint = account.defaultBoardId
-    ? await loadSprint(client, account.defaultBoardId)
-    : undefined;
-  return {
-    ...base,
-    connection: "connected",
-    assigned,
-    overdue,
-    inReview,
-    blocked,
-    ...(sprint ? { sprint } : {}),
-  };
+  try {
+    const assigned = await safeCount(client, `${MINE} AND resolution = Unresolved`);
+    const overdue = await safeCount(
+      client,
+      `${MINE} AND resolution = Unresolved AND duedate < now()`,
+    );
+    const inReview = await safeCount(
+      client,
+      `${MINE} AND resolution = Unresolved AND (status = "In Review" OR status = "Review")`,
+    );
+    const blocked = await safeCount(
+      client,
+      `${MINE} AND resolution = Unresolved AND status = Blocked`,
+    );
+    const sprint = account.defaultBoardId
+      ? await loadSprint(client, account.defaultBoardId)
+      : undefined;
+    return {
+      ...base,
+      connection: "connected",
+      assigned,
+      overdue,
+      inReview,
+      blocked,
+      ...(sprint ? { sprint } : {}),
+    };
+  } catch (error) {
+    const message = messageOf(error);
+    return {
+      ...base,
+      connection: /401|rejected|unauthorized/i.test(message)
+        ? "expired"
+        : "unreachable",
+      detail: message,
+    };
+  }
 }
 
 /** Loads one account at a time; never fans out requests across accounts. */
