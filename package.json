@@ -4,13 +4,29 @@
   "description": "AXI CLI for Jira Cloud",
   "type": "module",
   "packageManager": "pnpm@11.1.1",
-  "repository": { "type": "git", "url": "https://github.com/lytv/jira-axi.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lytv/jira-axi.git"
+  },
   "license": "MIT",
-  "bin": { "jra-axi": "./dist/bin/jra-axi.js" },
-  "exports": { ".": { "types": "./dist/src/index.d.ts", "default": "./dist/src/index.js" } },
+  "bin": {
+    "jra-axi": "./dist/bin/jra-axi.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
   "types": "./dist/src/index.d.ts",
-  "files": ["dist", "LICENSE", "README.md"],
-  "publishConfig": { "access": "public" },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc && node -e \"require('node:fs').copyFileSync('package.json', 'dist/package.json')\"",
     "test": "pnpm run build && vitest run",
@@ -20,8 +36,14 @@
     "format:check": "prettier --check .",
     "prepublishOnly": "pnpm run build"
   },
-  "engines": { "node": ">=22.19" },
-  "dependencies": { "@toon-format/toon": "2.1.0", "axi-sdk-js": "^0.1.10", "js-yaml": "^4.1.1" },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "dependencies": {
+    "@toon-format/toon": "2.1.0",
+    "axi-sdk-js": "^0.1.10",
+    "js-yaml": "^4.1.1"
+  },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/js-yaml": "^4.0.9",

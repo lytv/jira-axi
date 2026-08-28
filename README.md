@@ -15,4 +15,4 @@ jra-axi accounts add --id work --site example --email agent@example.com --token-
 jra-axi auth
 ```
 
-Use an environment variable or a keychain reference for tokens. File token storage is a last resort and must use mode `0600`.
+Use `--token-env` for tokens. You can use `--token-file` with mode `0600`. Keychain token sources are not available in this build.
