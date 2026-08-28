@@ -12,9 +12,19 @@ describe("version fast path", () => {
     ]);
     const manifest = JSON.parse(
       await readFile("dist/package.json", "utf8"),
-    ) as { bin: { "jra-axi": string }; version: string };
+    ) as {
+      name: string;
+      bin: { "jra-axi": string };
+      version: string;
+      repository: { type: string; url: string };
+    };
     expect(result.stdout.trim()).toBe(manifest.version);
+    expect(manifest.name).toBe("@lyrks/jira-axi");
     expect(manifest.bin["jra-axi"]).toBe("dist/bin/jra-axi.js");
+    expect(manifest.repository).toEqual({
+      type: "git",
+      url: "https://github.com/lytv/jira-axi.git",
+    });
     expect((await stat("dist/bin/jra-axi.js")).mode & 0o111).not.toBe(0);
   });
 });

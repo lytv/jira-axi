@@ -1,4 +1,4 @@
-# @lytv/jira-axi
+# @lyrks/jira-axi
 
 An AXI-shaped CLI for Jira Cloud agents.
 
@@ -18,19 +18,19 @@ Install the skill in the [Agent Skills](https://agentskills.io) format with [`np
 npx skills add lytv/jira-axi --skill jra-axi -g
 ```
 
-The skill teaches your agent to run the CLI through `npx -y @lytv/jira-axi` on demand.
+The skill teaches your agent to run the CLI through `npx -y @lyrks/jira-axi` on demand.
 `-g` installs the skill for all projects (for example `~/.claude/skills/`). Drop `-g` to install for the current project only.
 
 **Direct use**
 
 ```sh
-npx -y @lytv/jira-axi
+npx -y @lyrks/jira-axi
 ```
 
 **Global install**
 
 ```sh
-pnpm add -g @lytv/jira-axi
+pnpm add -g @lyrks/jira-axi
 ```
 
 A global install is required for SessionStart hooks.

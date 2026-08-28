@@ -1,5 +1,5 @@
 {
-  "name": "@lytv/jira-axi",
+  "name": "@lyrks/jira-axi",
   "version": "0.1.0",
   "description": "AXI CLI for Jira Cloud",
   "type": "module",

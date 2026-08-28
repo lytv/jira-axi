@@ -52,13 +52,13 @@ describe("createSkillMarkdown", () => {
     });
   });
 
-  it("stays a short stub that defers to npx -y @lytv/jira-axi", () => {
+  it("stays a short stub that defers to npx -y @lyrks/jira-axi", () => {
     const markdown = createSkillMarkdown();
     const body = skillBody(markdown);
     expect(markdown.length).toBeLessThanOrEqual(MAX_SKILL_MARKDOWN_CHARS);
     expect(body).toContain(DESCRIPTION);
-    expect(body).toContain("npx -y @lytv/jira-axi");
-    expect(body).toContain("npx -y @lytv/jira-axi --help");
+    expect(body).toContain("npx -y @lyrks/jira-axi");
+    expect(body).toContain("npx -y @lyrks/jira-axi --help");
     expect(body).not.toMatch(/^## Commands/m);
     expect(body).not.toMatch(/^## Tips/m);
     expect(body).not.toMatch(/^## Workflow/m);
