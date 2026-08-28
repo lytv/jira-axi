@@ -61,6 +61,69 @@ describe("JiraClient", () => {
     ).toBe(true);
   });
 
+  it("stops paging once limit is reached, without fetching further pages", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const client = new JiraClient(account, "token", {
+      fetcher: async (input, init) => {
+        const url = String(input);
+        calls.push({
+          url,
+          body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        });
+        return response({
+          issues: [
+            { id: "1", key: "AXI-1", fields: {} },
+            { id: "2", key: "AXI-2", fields: {} },
+          ],
+          nextPageToken: "page-2",
+        });
+      },
+    });
+    const result = await client.searchJql("project = AXI", ["summary"], 50, 2);
+    expect(result.issues.map((issue) => issue.key)).toEqual(["AXI-1", "AXI-2"]);
+    expect(result.nextPageToken).toBe("page-2");
+    const searchCalls = calls.filter((call) =>
+      call.url.includes("/search/jql"),
+    );
+    expect(searchCalls).toHaveLength(1);
+    expect(searchCalls[0].body).toMatchObject({ maxResults: 2 });
+  });
+
+  it("caps maxResults per page and slices a final over-limit page", async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    const client = new JiraClient(account, "token", {
+      fetcher: async (input, init) => {
+        const url = String(input);
+        calls.push({
+          url,
+          body: init?.body ? JSON.parse(String(init.body)) : undefined,
+        });
+        const page = calls.filter((call) =>
+          call.url.includes("/search/jql"),
+        ).length;
+        if (page === 1)
+          return response({
+            issues: [{ id: "1", key: "AXI-1", fields: {} }],
+            nextPageToken: "page-2",
+          });
+        return response({
+          issues: [
+            { id: "2", key: "AXI-2", fields: {} },
+            { id: "3", key: "AXI-3", fields: {} },
+          ],
+        });
+      },
+    });
+    const result = await client.searchJql("project = AXI", ["summary"], 1, 2);
+    expect(result.issues.map((issue) => issue.key)).toEqual(["AXI-1", "AXI-2"]);
+    const searchCalls = calls.filter((call) =>
+      call.url.includes("/search/jql"),
+    );
+    expect(searchCalls).toHaveLength(2);
+    expect(searchCalls[0].body).toMatchObject({ maxResults: 1 });
+    expect(searchCalls[1].body).toMatchObject({ maxResults: 1 });
+  });
+
   it("uses the classic pager only for list endpoints", async () => {
     const urls: string[] = [];
     const client = new JiraClient(account, "token", {

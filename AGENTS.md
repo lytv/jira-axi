@@ -6,6 +6,8 @@ The client uses REST v3 for Jira resources and Agile 1.0 for boards and sprints.
 
 Never store raw API tokens in account config. See `src/accounts.ts` for account schema and token-source rules.
 
+Issue commands live in `src/commands/issues.ts`. Mutation and single-key commands resolve one account and never fan out across sites.
+
 ## Maintaining this file
 
 Keep only durable project facts here. Link to source files when they define details. Remove facts that no longer apply.
