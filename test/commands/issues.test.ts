@@ -6,7 +6,7 @@ import {
   type IssuesClient,
   type IssuesDeps,
 } from "../../src/commands/issues.js";
-import type { Account } from "../../src/types.js";
+import type { Account, JiraIssue } from "../../src/types.js";
 
 const account = (id: string, isDefault = false): Account => ({
   id,
@@ -34,15 +34,54 @@ function adfParagraph(text: string) {
   };
 }
 
+async function searchJqlViaRest(
+  rest: IssuesClient["rest"],
+  jql: string,
+  fields: string[],
+  maxResults: number,
+  limit?: number,
+): Promise<{ issues: JiraIssue[]; nextPageToken?: string }> {
+  const issues: JiraIssue[] = [];
+  let nextPageToken: string | undefined;
+  do {
+    const remaining = limit === undefined ? maxResults : limit - issues.length;
+    const page = (await rest("/search/jql", {
+      method: "POST",
+      body: {
+        jql,
+        fields,
+        maxResults: Math.min(maxResults, remaining),
+        ...(nextPageToken ? { nextPageToken } : {}),
+      },
+    })) as { issues?: JiraIssue[]; nextPageToken?: string };
+    issues.push(...(page.issues ?? []));
+    nextPageToken = page.nextPageToken;
+  } while (nextPageToken && (limit === undefined || issues.length < limit));
+  return {
+    issues: limit === undefined ? issues : issues.slice(0, limit),
+    ...(nextPageToken ? { nextPageToken } : {}),
+  };
+}
+
+async function approximateSearchCountViaRest(
+  rest: IssuesClient["rest"],
+  jql: string,
+): Promise<number | undefined> {
+  const result = (await rest("/search/approximate-count", {
+    method: "POST",
+    body: { jql },
+  })) as { count?: number };
+  return result.count;
+}
+
 function createDeps(
   routes: Route[],
   accounts: Account[] = [account("work", true)],
 ): { deps: IssuesDeps; calls: Call[] } {
   const calls: Call[] = [];
   const remaining = [...routes];
-  const clientFor = (item: Account): IssuesClient => ({
-    account: item,
-    rest: async (path, options) => {
+  const clientFor = (item: Account): IssuesClient => {
+    const rest: IssuesClient["rest"] = async (path, options) => {
       const method = (options?.method ?? "GET").toUpperCase();
       calls.push({
         method,
@@ -65,8 +104,15 @@ function createDeps(
         throw new AxiError(`Jira request failed for ${path}`, "JIRA_ERROR");
       }
       return route.body;
-    },
-  });
+    };
+    return {
+      account: item,
+      rest,
+      searchJql: (jql, fields, maxResults, limit) =>
+        searchJqlViaRest(rest, jql, fields, maxResults, limit),
+      approximateSearchCount: (jql) => approximateSearchCountViaRest(rest, jql),
+    };
+  };
   return {
     calls,
     deps: {
@@ -156,13 +202,8 @@ describe("issues list", () => {
   });
 
   it("names the JQL and account id when the list is empty", async () => {
-    const { deps } = createDeps([
+    const { deps, calls } = createDeps([
       { method: "POST", path: "/search/jql", body: { issues: [] } },
-      {
-        method: "POST",
-        path: "/search/approximate-count",
-        body: { count: 0 },
-      },
     ]);
     const result = await issuesCommand(
       ["list", "--jql", "project = EMPTY"],
@@ -170,6 +211,9 @@ describe("issues list", () => {
     );
     expect(result.issues).toBe(
       '0 results for JQL "(project = EMPTY)" on account work',
+    );
+    expect(calls.some((call) => call.path === "/search/approximate-count")).toBe(
+      false,
     );
   });
 });
@@ -240,6 +284,30 @@ describe("issues view", () => {
     expect(issue.description).toBe(exactText);
     expect(issue.help).toBeUndefined();
     expect(issue.parent).toBeUndefined();
+  });
+
+  it("omits next-step help when an untruncated description mentions --full", async () => {
+    const { deps } = createDeps([
+      {
+        path: "/issue/AXI-1",
+        body: {
+          id: "1",
+          key: "AXI-1",
+          fields: {
+            summary: "Fix auth",
+            status: { name: "To Do" },
+            assignee: null,
+            description: adfParagraph("Please use --full here for details"),
+            comment: { total: 0, comments: [] },
+            issuelinks: [],
+          },
+        },
+      },
+    ]);
+    const result = await issuesCommand(["view", "AXI-1"], deps);
+    const issue = result.issue as Record<string, unknown>;
+    expect(issue.description).toBe("Please use --full here for details");
+    expect(issue.help).toBeUndefined();
   });
 
   it("omits next-step help when --full shows complete text", async () => {

@@ -15,7 +15,10 @@ import type {
   JiraIssue,
 } from "../types.js";
 
-export type IssuesClient = Pick<JiraClient, "rest"> & { account: Account };
+export type IssuesClient = Pick<
+  JiraClient,
+  "rest" | "searchJql" | "approximateSearchCount"
+> & { account: Account };
 export type IssuesDeps = {
   readAccounts?: () => Promise<Account[]>;
   tokenForAccount?: (account: Account) => Promise<string>;
@@ -27,6 +30,7 @@ const DEFAULT_LIMIT = 50;
 const AUTO_CREATE_FIELDS = new Set(["project", "issuetype", "reporter"]);
 const BOOLEAN_FLAGS = new Set(["--help", "--full", "--yes", "--list"]);
 const OBJECT_NAME_FIELDS = new Set(["priority", "resolution", "issuetype"]);
+const TRUNCATION_MARKER = /\.\.\. \[\d+ chars; use --full\]$/;
 
 function usage(message: string, suggestions: string[] = []): AxiError {
   return new AxiError(message, "VALIDATION_ERROR", suggestions);
@@ -239,32 +243,6 @@ async function myselfId(client: IssuesClient): Promise<string> {
   if (typeof me?.accountId !== "string")
     throw usage("Cannot resolve the current user accountId");
   return me.accountId;
-}
-
-async function searchIssues(
-  client: IssuesClient,
-  jql: string,
-  fields: string[],
-  limit: number,
-): Promise<JiraIssue[]> {
-  const issues: JiraIssue[] = [];
-  let nextPageToken: string | undefined;
-  while (issues.length < limit) {
-    const page = (await client.rest("/search/jql", {
-      method: "POST",
-      body: {
-        jql,
-        fields,
-        maxResults: Math.min(100, limit - issues.length),
-        ...(nextPageToken ? { nextPageToken } : {}),
-      },
-    })) as { issues?: JiraIssue[]; nextPageToken?: string };
-    const batch = page.issues ?? [];
-    issues.push(...batch);
-    nextPageToken = page.nextPageToken;
-    if (!nextPageToken || batch.length === 0) break;
-  }
-  return issues.slice(0, limit);
 }
 
 function flattenListValue(name: string, issue: JiraIssue): unknown {
@@ -590,22 +568,14 @@ async function listIssues(
   const jql = await buildJql(parsed.flags, client);
   const jiraFields = fields.filter((name) => name !== "key");
   const requestFields = jiraFields.length ? jiraFields : ["summary"];
-  const [issues, total] = await Promise.all([
-    searchIssues(client, jql, requestFields, limit),
-    client.rest("/search/approximate-count", {
-      method: "POST",
-      body: { jql },
-    }) as Promise<{ count?: number }>,
-  ]);
+  const { issues } = await client.searchJql(jql, requestFields, 50, limit);
   if (issues.length === 0) {
     return {
       issues: `0 results for JQL "${jql}" on account ${account.id}`,
     };
   }
-  const count = aggregateCount(issues.length, total.count).replace(
-    /^count: /,
-    "",
-  );
+  const total = await client.approximateSearchCount(jql);
+  const count = aggregateCount(issues.length, total).replace(/^count: /, "");
   return {
     count,
     issues: issues.map((issue) => listRow(issue, fields)),
@@ -662,8 +632,8 @@ async function viewIssue(
     };
   });
   const truncated =
-    description.includes("use --full") ||
-    commentBodies.some((comment) => comment.body.includes("use --full"));
+    TRUNCATION_MARKER.test(description) ||
+    commentBodies.some((comment) => TRUNCATION_MARKER.test(comment.body));
   const parent = record(issue.fields.parent);
   const payload: Record<string, unknown> = {
     key: issue.key,

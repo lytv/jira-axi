@@ -111,25 +111,30 @@ export class JiraClient {
     jql: string,
     fields: string[],
     maxResults = 50,
+    limit?: number,
   ): Promise<{ issues: JiraIssue[]; nextPageToken?: string }> {
     if (fields.length === 0)
       throw new JiraClientError("Jira search requires at least one field");
     const issues: JiraIssue[] = [];
     let nextPageToken: string | undefined;
     do {
+      const remaining = limit === undefined ? maxResults : limit - issues.length;
       const page = (await this.rest("/search/jql", {
         method: "POST",
         body: {
           jql,
           fields,
-          maxResults,
+          maxResults: Math.min(maxResults, remaining),
           ...(nextPageToken ? { nextPageToken } : {}),
         },
       })) as { issues?: JiraIssue[]; nextPageToken?: string };
       issues.push(...(page.issues ?? []));
       nextPageToken = page.nextPageToken;
-    } while (nextPageToken);
-    return { issues, ...(nextPageToken ? { nextPageToken } : {}) };
+    } while (nextPageToken && (limit === undefined || issues.length < limit));
+    return {
+      issues: limit === undefined ? issues : issues.slice(0, limit),
+      ...(nextPageToken ? { nextPageToken } : {}),
+    };
   }
 
   async approximateSearchCount(jql: string): Promise<number | undefined> {
