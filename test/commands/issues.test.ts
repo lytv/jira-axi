@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { AxiError } from "axi-sdk-js";
 import { toAdf } from "../../src/adf.js";
-import {
-  issuesCommand,
-  type IssuesClient,
-  type IssuesDeps,
-} from "../../src/commands/issues.js";
-import type { Account, JiraIssue } from "../../src/types.js";
+import { JiraClient, type FetchLike } from "../../src/client.js";
+import { issuesCommand, type IssuesDeps } from "../../src/commands/issues.js";
+import type { Account } from "../../src/types.js";
 
 const account = (id: string, isDefault = false): Account => ({
   id,
@@ -34,44 +31,35 @@ function adfParagraph(text: string) {
   };
 }
 
-async function searchJqlViaRest(
-  rest: IssuesClient["rest"],
-  jql: string,
-  fields: string[],
-  maxResults: number,
-  limit?: number,
-): Promise<{ issues: JiraIssue[]; nextPageToken?: string }> {
-  const issues: JiraIssue[] = [];
-  let nextPageToken: string | undefined;
-  do {
-    const remaining = limit === undefined ? maxResults : limit - issues.length;
-    const page = (await rest("/search/jql", {
-      method: "POST",
-      body: {
-        jql,
-        fields,
-        maxResults: Math.min(maxResults, remaining),
-        ...(nextPageToken ? { nextPageToken } : {}),
-      },
-    })) as { issues?: JiraIssue[]; nextPageToken?: string };
-    issues.push(...(page.issues ?? []));
-    nextPageToken = page.nextPageToken;
-  } while (nextPageToken && (limit === undefined || issues.length < limit));
-  return {
-    issues: limit === undefined ? issues : issues.slice(0, limit),
-    ...(nextPageToken ? { nextPageToken } : {}),
-  };
-}
-
-async function approximateSearchCountViaRest(
-  rest: IssuesClient["rest"],
-  jql: string,
-): Promise<number | undefined> {
-  const result = (await rest("/search/approximate-count", {
-    method: "POST",
-    body: { jql },
-  })) as { count?: number };
-  return result.count;
+function fetcherFor(routes: Route[], calls: Call[]): FetchLike {
+  const remaining = [...routes];
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const method = (init?.method ?? "GET").toUpperCase();
+    const path = url.pathname.replace(/^\/rest\/api\/3/, "");
+    const query = Object.fromEntries(url.searchParams);
+    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+    calls.push({
+      method,
+      path,
+      body,
+      query: Object.keys(query).length ? query : undefined,
+    });
+    const index = remaining.findIndex((route) => {
+      const wanted = (route.method ?? "GET").toUpperCase();
+      if (wanted !== method) return false;
+      return typeof route.path === "string"
+        ? path === route.path
+        : route.path.test(path);
+    });
+    if (index === -1) throw new Error(`Unexpected ${method} ${path}`);
+    const route = remaining.splice(index, 1)[0];
+    const status = route.status ?? (route.body === undefined ? 204 : 200);
+    return new Response(
+      route.body === undefined ? undefined : JSON.stringify(route.body),
+      { status, headers: { "content-type": "application/json" } },
+    );
+  }) as FetchLike;
 }
 
 function createDeps(
@@ -79,46 +67,13 @@ function createDeps(
   accounts: Account[] = [account("work", true)],
 ): { deps: IssuesDeps; calls: Call[] } {
   const calls: Call[] = [];
-  const remaining = [...routes];
-  const clientFor = (item: Account): IssuesClient => {
-    const rest: IssuesClient["rest"] = async (path, options) => {
-      const method = (options?.method ?? "GET").toUpperCase();
-      calls.push({
-        method,
-        path,
-        body: options?.body,
-        query: options?.query,
-      });
-      const index = remaining.findIndex((route) => {
-        const wanted = (route.method ?? "GET").toUpperCase();
-        if (wanted !== method) return false;
-        return typeof route.path === "string"
-          ? path === route.path
-          : route.path.test(path);
-      });
-      if (index === -1) {
-        throw new Error(`Unexpected ${method} ${path}`);
-      }
-      const route = remaining.splice(index, 1)[0];
-      if (route.status && route.status >= 400) {
-        throw new AxiError(`Jira request failed for ${path}`, "JIRA_ERROR");
-      }
-      return route.body;
-    };
-    return {
-      account: item,
-      rest,
-      searchJql: (jql, fields, maxResults, limit) =>
-        searchJqlViaRest(rest, jql, fields, maxResults, limit),
-      approximateSearchCount: (jql) => approximateSearchCountViaRest(rest, jql),
-    };
-  };
+  const fetcher = fetcherFor(routes, calls);
   return {
     calls,
     deps: {
       readAccounts: async () => accounts,
       tokenForAccount: async () => "token",
-      createClient: (item) => clientFor(item),
+      createClient: (item) => new JiraClient(item, "token", { fetcher }),
     },
   };
 }
