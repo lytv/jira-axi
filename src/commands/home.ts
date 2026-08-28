@@ -24,6 +24,7 @@ function usage(message: string, suggestions: string[] = []): AxiError {
 
 function presentAccount(
   summary: AssignedAccountSummary,
+  compact = false,
 ): Record<string, unknown> {
   if (summary.status && summary.status !== "connected") {
     return {
@@ -40,6 +41,7 @@ function presentAccount(
     inReview: summary.inReview,
     blocked: summary.blocked,
   };
+  if (compact) return counts;
   if (summary.issues.length === 0) {
     return {
       ...counts,
@@ -58,6 +60,7 @@ function firstIssueKey(summaries: AssignedAccountSummary[]): string {
 
 export function homePayload(
   summaries: AssignedAccountSummary[],
+  compact = false,
 ): Record<string, unknown> {
   if (summaries.length === 0) {
     return {
@@ -70,7 +73,7 @@ export function homePayload(
     };
   }
   return {
-    accounts: summaries.map(presentAccount),
+    accounts: summaries.map((summary) => presentAccount(summary, compact)),
     help: [
       `Run \`jra-axi issues view ${firstIssueKey(summaries)}\``,
       "Run `jra-axi accounts list`",
@@ -84,8 +87,9 @@ export async function homeCommand(
   deps: HomeDeps = {},
 ): Promise<Record<string, unknown> | string> {
   const json = args.includes("--json");
-  if (args.some((arg) => arg !== "--json"))
+  const compact = args.includes("--compact");
+  if (args.some((arg) => arg !== "--json" && arg !== "--compact"))
     throw usage("home accepts only --json", ["Run `jra-axi home --json`"]);
-  const payload = homePayload(await assignedSummaries(deps));
+  const payload = homePayload(await assignedSummaries(deps), compact);
   return json ? render(payload, true) : payload;
 }

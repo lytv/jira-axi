@@ -175,6 +175,27 @@ describe("assignedSummaries", () => {
     expect(summaries[0].status).toBe("connected");
   });
 
+  it("marks an account unreachable when an optional count fails", async () => {
+    const summaries = await assignedSummaries(
+      depsFor(
+        [account("work")],
+        {
+          [ASSIGNED_JQL]: 3,
+          [OVERDUE_JQL]: 0,
+          [IN_REVIEW_JQL]: new Error("Jira rate limited /search/jql"),
+        },
+        { [IN_REVIEW_JQL]: new Error("Jira rate limited /search/jql") },
+        [],
+      ),
+    );
+    expect(summaries[0]).toMatchObject({
+      accountId: "work",
+      status: "unreachable",
+      assigned: 0,
+      issues: [],
+    });
+  });
+
   it("serializes per-account calls and does not fail the whole view on one error", async () => {
     const order: string[] = [];
     let inflight = 0;

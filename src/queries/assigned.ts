@@ -79,8 +79,12 @@ async function optionalCount(
 ): Promise<number> {
   try {
     return await countJql(client, jql);
-  } catch {
-    return 0;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/value .+ does not exist for the field ["']?status/i.test(message)) {
+      return 0;
+    }
+    throw error;
   }
 }
 

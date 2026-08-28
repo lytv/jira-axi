@@ -33,6 +33,28 @@ const connected = (
 });
 
 describe("home", () => {
+  it("omits issue rows from compact home output", () => {
+    const payload = homePayload(
+      [
+        connected("work", {
+          assigned: 1,
+          issues: [{ key: "AXI-1", summary: "Fix auth", status: "To Do" }],
+        }),
+      ],
+      true,
+    );
+    expect(payload.accounts).toEqual([
+      {
+        account: "work",
+        status: "connected",
+        assigned: 1,
+        overdue: 0,
+        inReview: 0,
+        blocked: 0,
+      },
+    ]);
+  });
+
   it("names the account in the empty assigned state", () => {
     const payload = homePayload([connected("work")]);
     expect(payload.accounts).toEqual([

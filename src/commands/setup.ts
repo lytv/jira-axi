@@ -3,6 +3,7 @@ import {
   installSessionStartHooks,
   type InstallSessionStartHooksOptions,
 } from "axi-sdk-js";
+import { fileURLToPath } from "node:url";
 
 export const SETUP_HELP = `usage: jra-axi setup hooks
 Install or repair agent SessionStart hooks for jra-axi ambient context.
@@ -19,6 +20,9 @@ function defaultInstall(): void {
   installSessionStartHooks({
     marker: "jra-axi",
     binaryNames: ["jra-axi"],
+    execPath: fileURLToPath(
+      new URL("../../bin/jra-axi-hook.js", import.meta.url),
+    ),
   });
 }
 
