@@ -57,7 +57,11 @@ describe("loadTuiSummary", () => {
       rest: async () => ({ accountId: "me" }),
       approximateSearchCount: async () => 0,
       listClassic: async () => [
-        { id: 1, name: "Sprint 24", endDate: new Date(Date.now() + 3 * 86_400_000).toISOString() },
+        {
+          id: 1,
+          name: "Sprint 24",
+          endDate: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+        },
       ],
     };
     const withBoard = await loadTuiSummary([account("work", "42")], {
@@ -121,6 +125,28 @@ describe("loadTuiSummary", () => {
     });
     expect(summary.accounts[0].connection).toBe("connected");
     expect(summary.accounts[0].blocked).toBe(0);
+  });
+
+  it("surfaces a non-status count failure as unreachable instead of a silent 0", async () => {
+    const summary = await loadTuiSummary([account("work")], {
+      tokenForAccount: async () => "token",
+      createClient: () => ({
+        rest: async () => ({ accountId: "me" }),
+        approximateSearchCount: async (jql: string) => {
+          if (jql.includes("Blocked"))
+            throw new Error("Service unavailable (500)");
+          return 0;
+        },
+        listClassic: async () => [],
+      }),
+    });
+    expect(summary.accounts[0]).toEqual({
+      id: "work",
+      site: "https://work.atlassian.net",
+      email: "agent@example.com",
+      connection: "unreachable",
+      detail: "Service unavailable (500)",
+    });
   });
 
   it("loads accounts one at a time in order", async () => {

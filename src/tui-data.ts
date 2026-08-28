@@ -112,7 +112,10 @@ async function loadAccountSummary(
     };
   }
   try {
-    const assigned = await safeCount(client, `${MINE} AND resolution = Unresolved`);
+    const assigned = await safeCount(
+      client,
+      `${MINE} AND resolution = Unresolved`,
+    );
     const overdue = await safeCount(
       client,
       `${MINE} AND resolution = Unresolved AND duedate < now()`,
@@ -155,6 +158,7 @@ export async function loadTuiSummary(
   deps: TuiDataDeps = defaultDeps,
 ): Promise<TuiSummary> {
   const rows: AccountSummary[] = [];
-  for (const account of accounts) rows.push(await loadAccountSummary(account, deps));
+  for (const account of accounts)
+    rows.push(await loadAccountSummary(account, deps));
   return { generatedAt: new Date().toISOString(), accounts: rows };
 }

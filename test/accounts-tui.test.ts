@@ -44,7 +44,9 @@ describe("accounts --tui", () => {
       createClient: () => connectedClient,
       isInteractive: () => false,
       io: () => {
-        throw new Error("the live loop must not run on a non-interactive terminal");
+        throw new Error(
+          "the live loop must not run on a non-interactive terminal",
+        );
       },
       columns: () => 100,
       noColor: () => true,

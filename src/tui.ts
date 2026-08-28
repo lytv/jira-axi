@@ -197,7 +197,9 @@ export function renderAccountsTui(
   }
   if (options.footerHint !== undefined) {
     lines.push("");
-    lines.push(`  ${colorize(truncate(options.footerHint, columns - 2), DIM, noColor)}`);
+    lines.push(
+      `  ${colorize(truncate(options.footerHint, columns - 2), DIM, noColor)}`,
+    );
   }
   return lines.join("\n");
 }

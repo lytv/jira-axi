@@ -7,11 +7,7 @@ import { load } from "js-yaml";
 import { JiraClient } from "./client.js";
 import { detectTuiColor, renderAccountsTui } from "./tui.js";
 import { formatInterval, runLiveTui, type LiveTuiIo } from "./tui-live.js";
-import {
-  loadTuiSummary,
-  type TuiClient,
-  type TuiSummary,
-} from "./tui-data.js";
+import { loadTuiSummary, type TuiClient, type TuiSummary } from "./tui-data.js";
 import type { Account, TokenSourceKind } from "./types.js";
 
 export const accountsPath = (): string =>
