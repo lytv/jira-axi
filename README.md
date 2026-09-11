@@ -80,6 +80,7 @@ jra-axi issues comment AXI-1 --body "Started"
 jra-axi projects list --account work
 jra-axi boards list --project ENG
 jra-axi sprints list --board 42 --state active
+jra-axi statuses create --project KAN --name Res
 jra-axi users whoami
 jra-axi setup hooks
 ```
@@ -101,6 +102,7 @@ Use `--token-env` for tokens. You can use `--token-file` with mode `0600`. Keych
 | `projects` | List and view projects                                                       |
 | `boards`   | List boards                                                                  |
 | `sprints`  | List and view sprints                                                        |
+| `statuses` | Create project-scoped statuses for team-managed projects                     |
 | `users`    | `whoami` and user search                                                     |
 | `setup`    | Install optional agent SessionStart hooks                                    |
 

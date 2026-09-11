@@ -11,13 +11,14 @@ import { homeCommand, HOME_HELP } from "./commands/home.js";
 import { issuesCommand } from "./commands/issues.js";
 import { projectsCommand, PROJECTS_HELP } from "./commands/projects.js";
 import { setupCommand, SETUP_HELP } from "./commands/setup.js";
+import { statusesCommand, STATUSES_HELP } from "./commands/statuses.js";
 import { usersCommand, USERS_HELP } from "./commands/users.js";
 import { VERSION } from "./version.js";
 
 export const DESCRIPTION = "Manage Jira Cloud resources for agents.";
 export const TOP_HELP = `usage: jra-axi <command> [flags]
-commands[9]:
-  (none)=home, accounts, auth, issues, projects, boards, sprints, users, setup
+commands[10]:
+  (none)=home, accounts, auth, issues, projects, boards, sprints, statuses, users, setup
 output:
   Default output is TOON. Use --json on auth and home for JSON.
   Use --tui on accounts for a human terminal dashboard.
@@ -29,6 +30,7 @@ examples:
   jra-axi issues view AXI-1
   jra-axi projects list --account work
   jra-axi sprints list --board 42 --state active
+  jra-axi statuses create --project KAN --name Res
   jra-axi setup hooks
 `;
 
@@ -56,6 +58,7 @@ export async function main(options: MainOptions = {}): Promise<void> {
       projects: projectsCommand,
       boards: boardsCommand,
       sprints: sprintsCommand,
+      statuses: statusesCommand,
       users: usersCommand,
       home: (args) => homeCommand(args),
       setup: (args) => setupCommand(args),
@@ -74,8 +77,10 @@ export async function main(options: MainOptions = {}): Promise<void> {
                 ? BOARDS_HELP
                 : command === "sprints"
                   ? SPRINTS_HELP
-                  : command === "users"
-                    ? USERS_HELP
-                    : undefined,
+                  : command === "statuses"
+                    ? STATUSES_HELP
+                    : command === "users"
+                      ? USERS_HELP
+                      : undefined,
   });
 }

@@ -1,7 +1,7 @@
 import { DESCRIPTION } from "./cli.js";
 
 export const SKILL_DESCRIPTION =
-  "Operate Jira Cloud through the jra-axi CLI - issues, projects, boards, sprints, users, and accounts. " +
+  "Operate Jira Cloud through the jra-axi CLI - issues, projects, boards, statuses, sprints, users, and accounts. " +
   "Use whenever a task touches Jira: listing or viewing issues, creating or updating work, transitions, " +
   "comments, assignments, searching with JQL, or working with projects, boards, and sprints.";
 
@@ -43,7 +43,7 @@ metadata:
 
 ${DESCRIPTION}
 
-Use jra-axi whenever a task touches Jira Cloud: issues, projects, boards, sprints, users, or accounts.
+Use jra-axi whenever a task touches Jira Cloud: issues, projects, boards, statuses, sprints, users, or accounts.
 
 ## Current guidance lives in the CLI
 
