@@ -1193,8 +1193,6 @@ async function attachIssue(
   return {
     issue: key,
     attachments,
-    help: [
-      "Attach is not idempotent. A repeat call uploads another copy.",
-    ],
+    help: ["Attach is not idempotent. A repeat call uploads another copy."],
   };
 }

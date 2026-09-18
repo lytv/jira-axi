@@ -657,10 +657,10 @@ describe("issues attach", () => {
     filename: string,
     url: string,
   ): Response {
-    return new Response(
-      JSON.stringify([{ id, filename, content: url }]),
-      { status: 200, headers: { "content-type": "application/json" } },
-    );
+    return new Response(JSON.stringify([{ id, filename, content: url }]), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
   }
 
   function attachDeps(

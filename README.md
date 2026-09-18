@@ -94,18 +94,18 @@ Use `--token-env` for tokens. You can use `--token-file` with mode `0600`. Keych
 
 ### Commands
 
-| Command    | Description                                                                  |
-| ---------- | ---------------------------------------------------------------------------- |
-| (none)     | Assigned-to-me home across configured Cloud accounts                         |
-| `accounts` | Add, list, import, default, remove, and `--tui` dashboard                    |
-| `auth`     | Check account connectivity without printing token values                     |
+| Command    | Description                                                                          |
+| ---------- | ------------------------------------------------------------------------------------ |
+| (none)     | Assigned-to-me home across configured Cloud accounts                                 |
+| `accounts` | Add, list, import, default, remove, and `--tui` dashboard                            |
+| `auth`     | Check account connectivity without printing token values                             |
 | `issues`   | List, view, create, update, assign, transition, comment, link, worklog, meta, attach |
-| `projects` | List and view projects                                                       |
-| `boards`   | List boards                                                                  |
-| `sprints`  | List and view sprints                                                        |
-| `statuses` | Create project-scoped statuses for team-managed projects                     |
-| `users`    | `whoami` and user search                                                     |
-| `setup`    | Install optional agent SessionStart hooks                                    |
+| `projects` | List and view projects                                                               |
+| `boards`   | List boards                                                                          |
+| `sprints`  | List and view sprints                                                                |
+| `statuses` | Create project-scoped statuses for team-managed projects                             |
+| `users`    | `whoami` and user search                                                             |
+| `setup`    | Install optional agent SessionStart hooks                                            |
 
 ## Development
 

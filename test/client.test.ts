@@ -215,7 +215,11 @@ describe("JiraClient", () => {
     expect(calls[1].url).toContain(
       "https://api.atlassian.com/ex/jira/cloud-1/rest/api/3/issue/AXI-1/attachments",
     );
-    expect(calls.every((call) => call.headers.get("x-atlassian-token") === "no-check")).toBe(true);
+    expect(
+      calls.every(
+        (call) => call.headers.get("x-atlassian-token") === "no-check",
+      ),
+    ).toBe(true);
     expect(calls.every((call) => call.body === form)).toBe(true);
   });
 

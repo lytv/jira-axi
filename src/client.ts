@@ -73,8 +73,8 @@ export class JiraClient {
             ...(options.multipart
               ? { "X-Atlassian-Token": "no-check" }
               : options.body === undefined
-              ? {}
-              : { "Content-Type": "application/json" }),
+                ? {}
+                : { "Content-Type": "application/json" }),
           },
           ...(options.multipart
             ? { body: options.multipart }
