@@ -1,3 +1,5 @@
+import { readFile as defaultReadFile } from "node:fs/promises";
+import { basename } from "node:path";
 import { AxiError } from "axi-sdk-js";
 import { readAccounts, resolveAccount, tokenForAccount } from "../accounts.js";
 import { toAdf } from "../adf.js";
@@ -17,12 +19,13 @@ import type {
 
 export type IssuesClient = Pick<
   JiraClient,
-  "rest" | "searchJql" | "approximateSearchCount"
+  "rest" | "postMultipart" | "searchJql" | "approximateSearchCount"
 > & { account: Account };
 export type IssuesDeps = {
   readAccounts?: () => Promise<Account[]>;
   tokenForAccount?: (account: Account) => Promise<string>;
   createClient?: (account: Account, token: string) => IssuesClient;
+  readFile?: (file: string) => Promise<Uint8Array>;
 };
 
 const DEFAULT_LIST_FIELDS = ["key", "summary", "status", "assignee"];
@@ -304,11 +307,13 @@ function groupHelp(): Record<string, unknown> {
       comment: "Add, list, edit, or delete comments. Not idempotent.",
       link: "Create or remove an issue link",
       worklog: "Add a worklog. Not idempotent.",
+      attach: "Upload files to an issue. Not idempotent.",
     },
     examples: [
       "jra-axi issues list --project AXI",
       "jra-axi issues view AXI-1",
       'jra-axi issues create --project AXI --type Task --summary "Fix login"',
+      "jra-axi issues attach AXI-1 ./review.html",
     ],
   };
 }
@@ -514,6 +519,23 @@ const HELP: Record<string, () => Record<string, unknown>> = {
           "Worklog add is not idempotent. A repeat call creates another worklog.",
       },
     ),
+  attach: () =>
+    helpFor(
+      "issues attach",
+      "Upload one or more local files to an issue. Attachments are not idempotent.",
+      {
+        "--account": "Account id",
+      },
+      [
+        "jra-axi issues attach AXI-1 ./review.html",
+        "jra-axi issues attach AXI-1 ./review.html ./notes.md",
+        "jra-axi issues attach AXI-1 ./review.html --account work",
+      ],
+      {
+        idempotency:
+          "Attach is not idempotent. A repeat call uploads another copy.",
+      },
+    ),
 };
 
 function maybeHelp(
@@ -545,6 +567,7 @@ export async function issuesCommand(
   if (subcommand === "comment") return commentIssue(parsed, deps);
   if (subcommand === "link") return linkIssue(parsed, deps);
   if (subcommand === "worklog") return worklogIssue(parsed, deps);
+  if (subcommand === "attach") return attachIssue(parsed, deps);
   throw usage("Unknown issues command", ["Run `jra-axi issues --help`"]);
 }
 
@@ -1114,6 +1137,64 @@ async function worklogIssue(
     time,
     help: [
       "Worklog add is not idempotent. A repeat call creates another worklog.",
+    ],
+  };
+}
+
+type JiraAttachment = {
+  id?: string | number;
+  filename?: string;
+  content?: string;
+  self?: string;
+};
+
+async function attachIssue(
+  parsed: ParsedArgs,
+  deps: IssuesDeps,
+): Promise<Record<string, unknown>> {
+  onlyFlags(parsed.flags, parsed.fields, []);
+  const key = requireKey(parsed.positionals, "attach");
+  const files = parsed.positionals.slice(1);
+  if (files.length === 0)
+    throw usage("File is required", [
+      "Run `jra-axi issues attach <KEY> <FILE...>`",
+    ]);
+  const read = deps.readFile ?? defaultReadFile;
+  const pending: Array<{ name: string; data: Uint8Array<ArrayBuffer> }> = [];
+  for (const file of files) {
+    try {
+      // ponytail: fresh ArrayBuffer copy keeps BlobPart typing exact.
+      const raw = await read(file);
+      const data = new Uint8Array(raw.length);
+      data.set(raw);
+      pending.push({ name: basename(file), data });
+    } catch {
+      throw usage(`File not found: ${file}`, ["Check the path and retry"]);
+    }
+  }
+  const { client } = await session(parsed.flags, deps);
+  const attachments: Array<{ id: string; filename: string; url: string }> = [];
+  for (const item of pending) {
+    const form = new FormData();
+    form.append("file", new Blob([item.data]), item.name);
+    const uploaded = (await client.postMultipart(
+      `/issue/${encodeURIComponent(key)}/attachments`,
+      form,
+    )) as JiraAttachment | JiraAttachment[];
+    const list = Array.isArray(uploaded) ? uploaded : [uploaded];
+    for (const entry of list) {
+      attachments.push({
+        id: String(entry.id ?? ""),
+        filename: entry.filename ?? item.name,
+        url: entry.content ?? entry.self ?? "",
+      });
+    }
+  }
+  return {
+    issue: key,
+    attachments,
+    help: [
+      "Attach is not idempotent. A repeat call uploads another copy.",
     ],
   };
 }

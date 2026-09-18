@@ -4,11 +4,11 @@ jra-axi is Jira Cloud only (`*.atlassian.net`). REST v3 covers Jira resources. A
 
 The v1 command surface includes accounts, auth, issues, projects, boards, sprints, statuses, users, home, TUI, skill, and setup hooks.
 
-Issues covers list, view, create, update, assign, transition, comment, link, worklog, and meta.
+Issues covers list, view, create, update, assign, transition, comment, link, worklog, attach, and meta.
 
 ## Out of scope for v1
 
-- Attachment upload and download
+- Attachment download
 - Watchers
 - Bulk edit and transition
 - Issue delete

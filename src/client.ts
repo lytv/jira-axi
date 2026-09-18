@@ -54,6 +54,51 @@ export class JiraClient {
     return this.request(path, { ...options, api: "agile" });
   }
 
+  async postMultipart(path: string, form: FormData): Promise<unknown> {
+    let scoped = false;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const response = await this.fetcher(this.url(path, "rest", scoped, undefined), {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Basic ${Buffer.from(`${this.account.email}:${this.token}`).toString("base64")}`,
+          "X-Atlassian-Token": "no-check",
+        },
+        body: form,
+      });
+      if (response.status === 401 && !scoped && this.account.cloudId) {
+        scoped = true;
+        continue;
+      }
+      if (response.status === 401 && !scoped && !this.account.cloudId) {
+        throw new JiraClientError(
+          "Jira rejected this token. It may be a scoped token with missing cloudId",
+          ["Set cloudId on this account, then retry"],
+        );
+      }
+      if (response.status === 429 && attempt < 3) {
+        const retryAfter = Number(response.headers.get("retry-after"));
+        await this.sleep(
+          Math.min(
+            Number.isFinite(retryAfter) && retryAfter > 0
+              ? retryAfter * 1000
+              : 500 * 2 ** attempt,
+            10_000,
+          ),
+        );
+        continue;
+      }
+      if (response.status === 429)
+        throw new JiraClientError(`Jira rate limited ${path}`, [
+          "Wait and retry this command",
+        ]);
+      if (!response.ok) throw await this.errorFor(response, path);
+      if (response.status === 204) return undefined;
+      return response.json();
+    }
+    throw new JiraClientError(`Jira request failed for ${path}`);
+  }
+
   async request(path: string, options: RequestOptions = {}): Promise<unknown> {
     const api = options.api ?? "rest";
     let scoped = false;
