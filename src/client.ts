@@ -6,6 +6,7 @@ type ApiKind = "rest" | "agile";
 type RequestOptions = {
   method?: string;
   body?: unknown;
+  multipart?: FormData;
   query?: Record<string, string | number | undefined>;
   api?: ApiKind;
 };
@@ -54,6 +55,10 @@ export class JiraClient {
     return this.request(path, { ...options, api: "agile" });
   }
 
+  async postMultipart(path: string, form: FormData): Promise<unknown> {
+    return this.request(path, { method: "POST", multipart: form });
+  }
+
   async request(path: string, options: RequestOptions = {}): Promise<unknown> {
     const api = options.api ?? "rest";
     let scoped = false;
@@ -65,13 +70,17 @@ export class JiraClient {
           headers: {
             Accept: "application/json",
             Authorization: `Basic ${Buffer.from(`${this.account.email}:${this.token}`).toString("base64")}`,
-            ...(options.body === undefined
-              ? {}
-              : { "Content-Type": "application/json" }),
+            ...(options.multipart
+              ? { "X-Atlassian-Token": "no-check" }
+              : options.body === undefined
+                ? {}
+                : { "Content-Type": "application/json" }),
           },
-          ...(options.body === undefined
-            ? {}
-            : { body: JSON.stringify(options.body) }),
+          ...(options.multipart
+            ? { body: options.multipart }
+            : options.body === undefined
+              ? {}
+              : { body: JSON.stringify(options.body) }),
         },
       );
       if (response.status === 401 && !scoped && this.account.cloudId) {

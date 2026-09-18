@@ -644,6 +644,158 @@ describe("issues help", () => {
   });
 });
 
+describe("issues attach", () => {
+  type UploadCall = {
+    method: string;
+    path: string;
+    token: string | null;
+    filenames: string[];
+  };
+
+  function attachmentResponse(
+    id: string,
+    filename: string,
+    url: string,
+  ): Response {
+    return new Response(JSON.stringify([{ id, filename, content: url }]), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  function attachDeps(
+    files: Record<string, string>,
+    respond: (filenames: string[], index: number) => Response,
+  ): { deps: IssuesDeps; calls: UploadCall[] } {
+    const calls: UploadCall[] = [];
+    const fetcher = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      const headers = new Headers(init?.headers);
+      const form = init?.body as FormData;
+      const filenames: string[] = [];
+      if (form && typeof form.entries === "function") {
+        for (const [name, entry] of form.entries()) {
+          if (name === "file" && entry instanceof File)
+            filenames.push(entry.name);
+        }
+      }
+      calls.push({
+        method: (init?.method ?? "GET").toUpperCase(),
+        path: url.pathname.replace(/^\/rest\/api\/3/, ""),
+        token: headers.get("x-atlassian-token"),
+        filenames,
+      });
+      return respond(filenames, calls.length - 1);
+    }) as FetchLike;
+    return {
+      calls,
+      deps: {
+        readAccounts: async () => [account("work", true)],
+        tokenForAccount: async () => "token",
+        createClient: (item) => new JiraClient(item, "token", { fetcher }),
+        readFile: async (file: string) => {
+          if (!(file in files)) throw new Error(`ENOENT: ${file}`);
+          return Buffer.from(files[file]);
+        },
+      },
+    };
+  }
+
+  it("fails before any upload when a file is missing", async () => {
+    const { deps, calls } = attachDeps({}, (filenames, index) =>
+      attachmentResponse(`a${index}`, filenames[0], "https://x/attachment"),
+    );
+    await expectUsage(
+      ["attach", "AXI-1", "./missing.html"],
+      deps,
+      /File not found: \.\/missing\.html/,
+    );
+    expect(calls).toHaveLength(0);
+  });
+
+  it("requires at least one file", async () => {
+    const { deps, calls } = attachDeps({}, (filenames, index) =>
+      attachmentResponse(`a${index}`, filenames[0], "https://x/attachment"),
+    );
+    await expectUsage(["attach", "AXI-1"], deps, /File is required/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("uploads a single file with the no-check token header", async () => {
+    const { deps, calls } = attachDeps({ "./review.html": "<h1>hi</h1>" }, () =>
+      attachmentResponse(
+        "10001",
+        "review.html",
+        "https://work.atlassian.net/rest/api/3/attachment/10001",
+      ),
+    );
+    const result = await issuesCommand(
+      ["attach", "AXI-1", "./review.html"],
+      deps,
+    );
+    expect(result.issue).toBe("AXI-1");
+    expect(result.attachments).toEqual([
+      {
+        id: "10001",
+        filename: "review.html",
+        url: "https://work.atlassian.net/rest/api/3/attachment/10001",
+      },
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].path).toBe("/issue/AXI-1/attachments");
+    expect(calls[0].token).toBe("no-check");
+    expect(calls[0].filenames).toEqual(["review.html"]);
+  });
+
+  it("uploads multiple files with one request each", async () => {
+    const { deps, calls } = attachDeps(
+      { "./review.html": "<h1>hi</h1>", "./notes.md": "# notes" },
+      (filenames, index) =>
+        attachmentResponse(
+          `1000${index}`,
+          filenames[0],
+          `https://work.atlassian.net/rest/api/3/attachment/1000${index}`,
+        ),
+    );
+    const result = await issuesCommand(
+      ["attach", "AXI-1", "./review.html", "./notes.md"],
+      deps,
+    );
+    expect(result.attachments).toEqual([
+      {
+        id: "10000",
+        filename: "review.html",
+        url: "https://work.atlassian.net/rest/api/3/attachment/10000",
+      },
+      {
+        id: "10001",
+        filename: "notes.md",
+        url: "https://work.atlassian.net/rest/api/3/attachment/10001",
+      },
+    ]);
+    expect(calls).toHaveLength(2);
+    expect(calls.map((call) => call.filenames)).toEqual([
+      ["review.html"],
+      ["notes.md"],
+    ]);
+  });
+
+  it("surfaces the Jira error when the upload fails", async () => {
+    const { deps } = attachDeps({ "./review.html": "<h1>hi</h1>" }, () => {
+      return new Response(
+        JSON.stringify({ errorMessages: ["Attachment is required"] }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      );
+    });
+    await expect(
+      issuesCommand(["attach", "AXI-1", "./review.html"], deps),
+    ).rejects.toThrow(
+      /Jira request failed for \/issue\/AXI-1\/attachments: Attachment is required/,
+    );
+  });
+});
+
 describe("issues meta", () => {
   it("surfaces required fields and valid issue types", async () => {
     const { deps } = createDeps([

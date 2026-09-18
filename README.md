@@ -77,6 +77,7 @@ jra-axi issues create --project AXI --type Task --summary "Fix login"
 jra-axi issues transition AXI-1 --list
 jra-axi issues transition AXI-1 --status "In Progress"
 jra-axi issues comment AXI-1 --body "Started"
+jra-axi issues attach AXI-1 ./review.html
 jra-axi projects list --account work
 jra-axi boards list --project ENG
 jra-axi sprints list --board 42 --state active
@@ -93,18 +94,18 @@ Use `--token-env` for tokens. You can use `--token-file` with mode `0600`. Keych
 
 ### Commands
 
-| Command    | Description                                                                  |
-| ---------- | ---------------------------------------------------------------------------- |
-| (none)     | Assigned-to-me home across configured Cloud accounts                         |
-| `accounts` | Add, list, import, default, remove, and `--tui` dashboard                    |
-| `auth`     | Check account connectivity without printing token values                     |
-| `issues`   | List, view, create, update, assign, transition, comment, link, worklog, meta |
-| `projects` | List and view projects                                                       |
-| `boards`   | List boards                                                                  |
-| `sprints`  | List and view sprints                                                        |
-| `statuses` | Create project-scoped statuses for team-managed projects                     |
-| `users`    | `whoami` and user search                                                     |
-| `setup`    | Install optional agent SessionStart hooks                                    |
+| Command    | Description                                                                          |
+| ---------- | ------------------------------------------------------------------------------------ |
+| (none)     | Assigned-to-me home across configured Cloud accounts                                 |
+| `accounts` | Add, list, import, default, remove, and `--tui` dashboard                            |
+| `auth`     | Check account connectivity without printing token values                             |
+| `issues`   | List, view, create, update, assign, transition, comment, link, worklog, meta, attach |
+| `projects` | List and view projects                                                               |
+| `boards`   | List boards                                                                          |
+| `sprints`  | List and view sprints                                                                |
+| `statuses` | Create project-scoped statuses for team-managed projects                             |
+| `users`    | `whoami` and user search                                                             |
+| `setup`    | Install optional agent SessionStart hooks                                            |
 
 ## Development
 
