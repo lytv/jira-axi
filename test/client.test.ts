@@ -194,6 +194,31 @@ describe("JiraClient", () => {
     );
   });
 
+  it("retries multipart uploads through the shared scoped request path", async () => {
+    const calls: Array<{ url: string; headers: Headers; body: unknown }> = [];
+    const client = new JiraClient({ ...account, cloudId: "cloud-1" }, "token", {
+      fetcher: async (input, init) => {
+        calls.push({
+          url: String(input),
+          headers: new Headers(init?.headers),
+          body: init?.body,
+        });
+        return calls.length === 1 ? response({}, 401) : response([]);
+      },
+    });
+    const form = new FormData();
+    form.append("file", new Blob(["review"]), "review.html");
+
+    await client.postMultipart("/issue/AXI-1/attachments", form);
+
+    expect(calls).toHaveLength(2);
+    expect(calls[1].url).toContain(
+      "https://api.atlassian.com/ex/jira/cloud-1/rest/api/3/issue/AXI-1/attachments",
+    );
+    expect(calls.every((call) => call.headers.get("x-atlassian-token") === "no-check")).toBe(true);
+    expect(calls.every((call) => call.body === form)).toBe(true);
+  });
+
   it("reports a missing cloudId without a raw Jira body", async () => {
     const client = new JiraClient(account, "token", {
       fetcher: async () =>
