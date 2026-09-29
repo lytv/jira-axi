@@ -122,7 +122,9 @@ describe("statuses", () => {
             simplified: true,
           });
         if (url.includes("/statuses/byNames"))
-          return response([{ id: "10100", name: "Res", statusCategory: "TODO" }]);
+          return response([
+            { id: "10100", name: "Res", statusCategory: "TODO" },
+          ]);
         return new Response(null, { status: 204 });
       }),
     );
@@ -133,7 +135,9 @@ describe("statuses", () => {
       status: { id: "10100", name: "Res", category: "TODO" },
       deleted: true,
     });
-    const deleteRequest = requests.find((request) => request.method === "DELETE");
+    const deleteRequest = requests.find(
+      (request) => request.method === "DELETE",
+    );
     expect(deleteRequest?.url).toContain("/rest/api/3/statuses");
     expect(deleteRequest?.url).toContain("id=10100");
   });
@@ -174,7 +178,9 @@ describe("statuses", () => {
               simplified: true,
             });
           if (url.includes("/statuses/byNames"))
-            return response([{ id: "10100", name: "Res", statusCategory: "TODO" }]);
+            return response([
+              { id: "10100", name: "Res", statusCategory: "TODO" },
+            ]);
           return new Response(
             JSON.stringify({
               errorMessages: ["Status is still used by workflow"],
