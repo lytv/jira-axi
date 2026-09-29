@@ -6,6 +6,9 @@ permissions: { contents: write, pull-requests: write, id-token: write }
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    # ponytail: secrets context is banned in step if lines, so bridge via env.
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -31,8 +34,8 @@ jobs:
       # ponytail: OIDC trusted publishing first, NPM_TOKEN fallback.
       # Configure ONE of these on npmjs.com / GitHub secrets, else publish 404s.
       - run: npm publish --access public --provenance
-        if: ${{ steps.release.outputs.release_created && secrets.NPM_TOKEN == '' }}
+        if: ${{ steps.release.outputs.release_created && env.NPM_TOKEN == '' }}
       - run: npm publish --access public
-        if: ${{ steps.release.outputs.release_created && secrets.NPM_TOKEN != '' }}
+        if: ${{ steps.release.outputs.release_created && env.NPM_TOKEN != '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
