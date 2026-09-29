@@ -107,6 +107,85 @@ describe("statuses", () => {
     expect(urls.every((url) => !url.endsWith("/statuses"))).toBe(true);
   });
 
+  it("deletes an existing status", async () => {
+    const requests: Array<{ url: string; method?: string }> = [];
+    const output = await statusesCommand(
+      ["delete", "--project", "KAN", "--name", "Res"],
+      commandOptions(async (input, init) => {
+        const url = String(input);
+        requests.push({ url, method: init?.method });
+        if (url.includes("/project/KAN"))
+          return response({
+            id: "10001",
+            key: "KAN",
+            name: "Kanban",
+            simplified: true,
+          });
+        if (url.includes("/statuses/byNames"))
+          return response([{ id: "10100", name: "Res", statusCategory: "TODO" }]);
+        return new Response(null, { status: 204 });
+      }),
+    );
+
+    expect(output).toMatchObject({
+      account: "work",
+      project: "KAN",
+      status: { id: "10100", name: "Res", category: "TODO" },
+      deleted: true,
+    });
+    const deleteRequest = requests.find((request) => request.method === "DELETE");
+    expect(deleteRequest?.url).toContain("/rest/api/3/statuses");
+    expect(deleteRequest?.url).toContain("id=10100");
+  });
+
+  it("does not delete a status that does not exist", async () => {
+    const output = await statusesCommand(
+      ["delete", "--project", "KAN", "--name", "Missing"],
+      commandOptions(async (input) => {
+        const url = String(input);
+        if (url.includes("/project/KAN"))
+          return response({
+            id: "10001",
+            key: "KAN",
+            name: "Kanban",
+            simplified: true,
+          });
+        return response([]);
+      }),
+    );
+
+    expect(output).toMatchObject({
+      deleted: false,
+      message: 'Status "Missing" does not exist in project KAN (no-op)',
+    });
+  });
+
+  it("propagates a Jira refusal to delete a status still in use", async () => {
+    await expect(
+      statusesCommand(
+        ["delete", "--project", "KAN", "--name", "Res"],
+        commandOptions(async (input) => {
+          const url = String(input);
+          if (url.includes("/project/KAN"))
+            return response({
+              id: "10001",
+              key: "KAN",
+              name: "Kanban",
+              simplified: true,
+            });
+          if (url.includes("/statuses/byNames"))
+            return response([{ id: "10100", name: "Res", statusCategory: "TODO" }]);
+          return new Response(
+            JSON.stringify({
+              errorMessages: ["Status is still used by workflow"],
+            }),
+            { status: 400, headers: { "content-type": "application/json" } },
+          );
+        }),
+      ),
+    ).rejects.toThrow("Status is still used by workflow");
+  });
+
   it("rejects a company-managed project", async () => {
     await expect(
       statusesCommand(

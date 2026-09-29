@@ -4,7 +4,8 @@ import { JiraClient } from "../client.js";
 import type { Account, JiraProject } from "../types.js";
 
 export const STATUSES_HELP = `usage: jra-axi statuses create [flags]
-Create a project-scoped status for a team-managed Jira Cloud project.
+       jra-axi statuses delete [flags]
+Create or delete a project-scoped status for a team-managed Jira Cloud project.
 flags:
   --project <key-or-id>        Team-managed project key or ID. Required
   --name <name>                Status name. Required
@@ -12,6 +13,7 @@ flags:
 examples:
   jra-axi statuses create --project KAN --name Res
   jra-axi statuses create --project KAN --name "Ready for QA" --account work
+  jra-axi statuses delete --project KAN --name Res
 `;
 
 type StatusesDependencies = {
@@ -84,8 +86,10 @@ export async function statusesCommand(
   options: StatusesDependencies = dependencies,
 ): Promise<Record<string, unknown>> {
   const [subcommand, ...rest] = args;
-  if (subcommand !== "create")
-    throw usage("Use statuses create --project <KEY> --name <name>");
+  if (subcommand !== "create" && subcommand !== "delete")
+    throw usage(
+      "Use statuses create --project <KEY> --name <name> or statuses delete --project <KEY> --name <name>",
+    );
   const values = flags(rest);
   const project = values.get("--project");
   const name = values.get("--name");
@@ -100,6 +104,26 @@ export async function statusesCommand(
   const existing = (await client.rest("/statuses/byNames", {
     query: { name, projectId: details.id },
   })) as StatusDetails[];
+  if (subcommand === "delete") {
+    if (existing.length === 0 || typeof existing[0].id !== "string") {
+      return {
+        account: account.id,
+        project,
+        deleted: false,
+        message: `Status ${JSON.stringify(name)} does not exist in project ${project} (no-op)`,
+      };
+    }
+    await client.rest("/statuses", {
+      method: "DELETE",
+      query: { id: existing[0].id },
+    });
+    return {
+      account: account.id,
+      project,
+      status: statusRow(existing[0]),
+      deleted: true,
+    };
+  }
   if (existing.length > 0) {
     return {
       account: account.id,
