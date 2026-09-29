@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/lytv/jira-axi/compare/v1.0.0...v1.1.0) (2026-09-29)
+
+
+### Features
+
+* **statuses:** add status deletion command ([#13](https://github.com/lytv/jira-axi/issues/13)) ([1b9c289](https://github.com/lytv/jira-axi/commit/1b9c289597255880e28171914b2b67ab12f23024))
+
 ## 1.0.0 (2026-09-18)
 
 
