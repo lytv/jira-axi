@@ -296,9 +296,11 @@ function groupHelp(): Record<string, unknown> {
   return {
     command: "issues",
     description: "Search, view, create, and update Jira Cloud issues",
+    flags: { "--json": "Output JSON instead of TOON" },
     subcommands: {
       list: "Search issues with JQL or filters",
       view: "Show one issue by key",
+      history: "Show all issue changes with author and time",
       transition: "List or apply a status transition",
       meta: "Show create metadata for a project",
       create: "Create an issue. Not idempotent.",
@@ -325,7 +327,13 @@ function helpFor(
   examples: string[],
   extra: Record<string, unknown> = {},
 ): Record<string, unknown> {
-  return { command, description, flags, examples, ...extra };
+  return {
+    command,
+    description,
+    flags: { ...flags, "--json": "Output JSON instead of TOON" },
+    examples,
+    ...extra,
+  };
 }
 
 const HELP: Record<string, () => Record<string, unknown>> = {
@@ -366,6 +374,16 @@ const HELP: Record<string, () => Record<string, unknown>> = {
         "jra-axi issues view AXI-1",
         "jra-axi issues view AXI-1 --full",
         "jra-axi issues view AXI-1 --account work",
+      ],
+    ),
+  history: () =>
+    helpFor(
+      "issues history",
+      "Show all changelog entries with author, time, and field changes (read-only).",
+      { "--account": "Account id" },
+      [
+        "jra-axi issues history AXI-1",
+        "jra-axi issues history AXI-1 --account work --json",
       ],
     ),
   transition: () =>
@@ -559,6 +577,7 @@ export async function issuesCommand(
   if (help) return help;
   if (subcommand === "list") return listIssues(parsed, deps);
   if (subcommand === "view") return viewIssue(parsed, deps);
+  if (subcommand === "history") return historyIssue(parsed, deps);
   if (subcommand === "transition") return transitionIssue(parsed, deps);
   if (subcommand === "meta") return metaIssue(parsed, deps);
   if (subcommand === "create") return createIssue(parsed, deps);
@@ -569,6 +588,71 @@ export async function issuesCommand(
   if (subcommand === "worklog") return worklogIssue(parsed, deps);
   if (subcommand === "attach") return attachIssue(parsed, deps);
   throw usage("Unknown issues command", ["Run `jra-axi issues --help`"]);
+}
+
+async function historyIssue(
+  parsed: ParsedArgs,
+  deps: IssuesDeps,
+): Promise<Record<string, unknown>> {
+  onlyFlags(parsed.flags, parsed.fields, []);
+  const key = requireKey(parsed.positionals, "history");
+  if (parsed.positionals.length > 1)
+    throw usage(`Unexpected argument ${parsed.positionals[1]}`);
+  const { client, account } = await session(parsed.flags, deps);
+  const history: Record<string, unknown>[] = [];
+  for (let startAt = 0; ; ) {
+    const page = (await client.rest(
+      `/issue/${encodeURIComponent(key)}/changelog`,
+      {
+        query: { startAt, maxResults: 100 },
+      },
+    )) as {
+      values?: Array<{
+        id?: string;
+        author?: unknown;
+        created?: string;
+        items?: Array<{
+          field?: string;
+          fieldId?: string;
+          from?: string | null;
+          fromString?: string | null;
+          to?: string | null;
+          toString?: string | null;
+        }>;
+      }>;
+      total?: number;
+      isLast?: boolean;
+    };
+    const entries = page.values ?? [];
+    history.push(
+      ...entries.map((entry) => ({
+        id: entry.id,
+        author: displayOf(entry.author),
+        authorAccountId: accountIdOf(entry.author) ?? null,
+        created: entry.created,
+        items: (entry.items ?? []).map((item) => ({
+          field: item.field,
+          fieldId: item.fieldId,
+          from: item.from ?? null,
+          fromString:
+            typeof item.fromString === "string" ? item.fromString : null,
+          to: item.to ?? null,
+          toString: typeof item.toString === "string" ? item.toString : null,
+        })),
+      })),
+    );
+    startAt += entries.length;
+    if (
+      page.isLast ||
+      entries.length === 0 ||
+      (page.total !== undefined && startAt >= page.total) ||
+      (page.total === undefined &&
+        page.isLast === undefined &&
+        entries.length < 100)
+    )
+      break;
+  }
+  return { account: account.id, issue: key, count: history.length, history };
 }
 
 async function listIssues(
