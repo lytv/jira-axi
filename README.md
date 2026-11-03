@@ -77,6 +77,7 @@ jra-axi issues create --project AXI --type Task --summary "Fix login"
 jra-axi issues transition AXI-1 --list
 jra-axi issues transition AXI-1 --status "In Progress"
 jra-axi issues comment AXI-1 --body "Started"
+jra-axi issues history AXI-1 --account work --json                # all changelog pages, read-only
 jra-axi issues attach AXI-1 ./review.html
 jra-axi projects list --account work
 jra-axi boards list --project ENG
@@ -89,7 +90,11 @@ jra-axi setup hooks
 
 Run `jra-axi <command> --help` for flags and full examples.
 
-Default stdout is compact TOON. Use `--json` on `home` and `auth` for JSON. Use `--full` on `issues view` for untruncated description and comment text.
+Requests time out after 30 seconds, including response body reads. Set `JRA_AXI_TIMEOUT_MS` to a positive integer in milliseconds to override this limit (maximum 2147483647). The client also accepts `timeoutMs` in its constructor options. A timeout returns `JIRA_TIMEOUT` with exit code 1. Read-only commands can retry. Before retrying a write, check whether Jira applied it; the CLI does not automatically retry timeouts.
+
+`jra-axi issues history <KEY> [--account <id>] [--json]` reads every changelog page. Each entry includes the author name and account ID, creation time, and each changed field's raw and display values (`from`, `fromString`, `to`, `toString`).
+
+Default stdout is compact TOON. Use `--json` on `home`, `auth`, `issues`, `projects`, `boards`, `sprints`, and `users` for JSON. The flag changes the format, not the result fields. Errors keep the existing TOON format and exit codes. Use `--full` on `issues view` for untruncated description and comment text.
 
 Use `--token-env` for tokens. You can use `--token-file` with mode `0600`. Keychain token sources are not available in this build.
 

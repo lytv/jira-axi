@@ -4,6 +4,15 @@ import { JiraClient } from "../client.js";
 import { render } from "../render.js";
 import type { Account } from "../types.js";
 
+export const AUTH_HELP = `usage: jra-axi auth [--json]
+Probe all configured accounts without changing Jira data.
+flags:
+  --json                       Output JSON instead of TOON
+examples:
+  jra-axi auth
+  jra-axi auth --json
+`;
+
 export type AuthReport = {
   account: string;
   status: "connected" | "expired" | "unreachable";

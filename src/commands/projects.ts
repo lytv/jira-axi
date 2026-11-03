@@ -8,6 +8,7 @@ commands:
   list                         List projects for one account
   view <KEY>                   Show one project
 flags:
+  --json                       Output JSON instead of TOON
   --account <id>               Account ID. Default: selected configured account
 examples:
   jra-axi projects list

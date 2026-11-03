@@ -1,6 +1,6 @@
 import { runAxiCli } from "axi-sdk-js";
-import { accountsCommand } from "./accounts.js";
-import { authCommand } from "./commands/auth.js";
+import { ACCOUNTS_HELP, accountsCommand } from "./accounts.js";
+import { AUTH_HELP, authCommand } from "./commands/auth.js";
 import {
   boardsCommand,
   BOARDS_HELP,
@@ -13,6 +13,7 @@ import { projectsCommand, PROJECTS_HELP } from "./commands/projects.js";
 import { setupCommand, SETUP_HELP } from "./commands/setup.js";
 import { statusesCommand, STATUSES_HELP } from "./commands/statuses.js";
 import { usersCommand, USERS_HELP } from "./commands/users.js";
+import { render } from "./render.js";
 import { VERSION } from "./version.js";
 
 export const DESCRIPTION = "Manage Jira Cloud resources for agents.";
@@ -20,7 +21,7 @@ export const TOP_HELP = `usage: jra-axi <command> [flags]
 commands[10]:
   (none)=home, accounts, auth, issues, projects, boards, sprints, statuses, users, setup
 output:
-  Default output is TOON. Use --json on auth and home for JSON.
+  Default output is TOON. Use --json on auth, home, issues, projects, boards, sprints, and users for JSON.
   Use --tui on accounts for a human terminal dashboard.
 examples:
   jra-axi
@@ -33,6 +34,23 @@ examples:
   jra-axi statuses create --project KAN --name Res
   jra-axi setup hooks
 `;
+
+function withJson(
+  command: (args: string[]) => Promise<Record<string, unknown>>,
+) {
+  return async (args: string[]) => {
+    const end = args.indexOf("--");
+    const json = args.some(
+      (arg, index) => arg === "--json" && (end < 0 || index < end),
+    );
+    const result = await command(
+      args.filter(
+        (arg, index) => !(arg === "--json" && (end < 0 || index < end)),
+      ),
+    );
+    return json ? render(result, true) : result;
+  };
+}
 
 type MainOptions = {
   argv?: string[];
@@ -54,33 +72,35 @@ export async function main(options: MainOptions = {}): Promise<void> {
     commands: {
       accounts: accountsCommand,
       auth: authCommand,
-      issues: (args) => issuesCommand(args),
-      projects: projectsCommand,
-      boards: boardsCommand,
-      sprints: sprintsCommand,
+      issues: withJson(issuesCommand),
+      projects: withJson(projectsCommand),
+      boards: withJson(boardsCommand),
+      sprints: withJson(sprintsCommand),
       statuses: statusesCommand,
-      users: usersCommand,
+      users: withJson(usersCommand),
       home: (args) => homeCommand(args),
       setup: (args) => setupCommand(args),
     },
     home: (args) => homeCommand(args),
     getCommandHelp: (command) =>
-      command === "accounts" || command === "auth"
-        ? TOP_HELP
-        : command === "home"
-          ? HOME_HELP
-          : command === "setup"
-            ? SETUP_HELP
-            : command === "projects"
-              ? PROJECTS_HELP
-              : command === "boards"
-                ? BOARDS_HELP
-                : command === "sprints"
-                  ? SPRINTS_HELP
-                  : command === "statuses"
-                    ? STATUSES_HELP
-                    : command === "users"
-                      ? USERS_HELP
-                      : undefined,
+      command === "accounts"
+        ? ACCOUNTS_HELP
+        : command === "auth"
+          ? AUTH_HELP
+          : command === "home"
+            ? HOME_HELP
+            : command === "setup"
+              ? SETUP_HELP
+              : command === "projects"
+                ? PROJECTS_HELP
+                : command === "boards"
+                  ? BOARDS_HELP
+                  : command === "sprints"
+                    ? SPRINTS_HELP
+                    : command === "statuses"
+                      ? STATUSES_HELP
+                      : command === "users"
+                        ? USERS_HELP
+                        : undefined,
   });
 }

@@ -8,6 +8,7 @@ commands:
   whoami                       Show the current Jira identity
   search --query <text>        List matching Jira users
 flags:
+  --json                       Output JSON instead of TOON
   --query <text>               Search text. Required for search
   --account <id>               Account ID. Default: selected configured account
 examples:

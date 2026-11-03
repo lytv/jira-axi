@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { JiraClient } from "../src/client.js";
 import type { Account } from "../src/types.js";
 
@@ -23,6 +23,108 @@ function response(
 }
 
 describe("JiraClient", () => {
+  it.each([0, 50])(
+    "returns a bare project array of length %s without paging it",
+    async (length) => {
+      const projects = Array.from({ length }, (_, id) => ({ id }));
+      let calls = 0;
+      const client = new JiraClient(account, "token", {
+        fetcher: async () => {
+          calls++;
+          return response(projects);
+        },
+      });
+      expect(await client.listClassic("/project")).toEqual(projects);
+      expect(calls).toBe(1);
+    },
+  );
+
+  it("aborts a hung request with a retryable timeout error and no automatic retry", async () => {
+    let calls = 0;
+    const client = new JiraClient(account, "token", {
+      timeoutMs: 5,
+      fetcher: async (_input, init) => {
+        calls++;
+        return new Promise((_resolve, reject) => {
+          init!.signal!.addEventListener(
+            "abort",
+            () => reject(new Error("aborted")),
+            { once: true },
+          );
+        });
+      },
+    });
+    await expect(client.rest("/myself")).rejects.toMatchObject({
+      code: "JIRA_TIMEOUT",
+      message: "Jira request timed out after 5ms for /myself",
+    });
+    expect(calls).toBe(1);
+  });
+
+  it.each([
+    { env: undefined, timeoutMs: undefined, expected: 30_000 },
+    { env: "17", timeoutMs: undefined, expected: 17 },
+    { env: "17", timeoutMs: 5, expected: 5 },
+  ])(
+    "uses the configured timeout $expected",
+    async ({ env, timeoutMs, expected }) => {
+      vi.useFakeTimers();
+      vi.stubEnv("JRA_AXI_TIMEOUT_MS", env);
+      try {
+        const client = new JiraClient(account, "token", {
+          timeoutMs,
+          fetcher: async (_input, init) =>
+            new Promise((_resolve, reject) => {
+              init!.signal!.addEventListener(
+                "abort",
+                () => reject(new Error("aborted")),
+                { once: true },
+              );
+            }),
+        });
+        const check = expect(client.rest("/myself")).rejects.toMatchObject({
+          code: "JIRA_TIMEOUT",
+          message: `Jira request timed out after ${expected}ms for /myself`,
+        });
+        await vi.advanceTimersByTimeAsync(expected);
+        await check;
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+        vi.unstubAllEnvs();
+      }
+    },
+  );
+
+  it("keeps the timeout active while reading the response body", async () => {
+    const client = new JiraClient(account, "token", {
+      timeoutMs: 5,
+      fetcher: async (_input, init) =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              init!.signal!.addEventListener(
+                "abort",
+                () => controller.error(new Error("aborted")),
+                { once: true },
+              );
+            },
+          }),
+        ),
+    });
+    await expect(client.rest("/myself")).rejects.toMatchObject({
+      code: "JIRA_TIMEOUT",
+    });
+  });
+
+  it.each([0, -1, NaN, 1.5, 2147483648])(
+    "rejects invalid timeout %s",
+    (timeoutMs) => {
+      expect(() => new JiraClient(account, "token", { timeoutMs })).toThrow(
+        "Request timeout must be a positive integer",
+      );
+    },
+  );
   it("uses /search/jql nextPageToken and approximate count", async () => {
     const calls: Array<{ url: string; body: unknown }> = [];
     const client = new JiraClient(account, "token", {

@@ -5,6 +5,7 @@ import type { Account, JiraBoard, JiraSprint } from "../types.js";
 
 export const BOARDS_HELP = `usage: jra-axi boards list [flags]
 flags:
+  --json                       Output JSON instead of TOON
   --project <key-or-id>        Limit boards to a project
   --account <id>               Account ID. Default: selected configured account
 examples:
@@ -18,6 +19,7 @@ commands:
   list --board <id>            List sprints for a board
   view <ID>                    Show one sprint
 flags:
+  --json                       Output JSON instead of TOON
   --board <id>                 Board ID. Required for list
   --state <active|future|closed> Limit listed sprints by state
   --account <id>               Account ID. Default: selected configured account

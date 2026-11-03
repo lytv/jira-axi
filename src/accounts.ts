@@ -18,6 +18,23 @@ export const accountsPath = (): string =>
   );
 type AccountsFile = { accounts: Account[] };
 
+export const ACCOUNTS_HELP = `usage: jra-axi accounts <list|add|remove|default|import> [flags]
+commands:
+  list                         List configured accounts
+  add --id <id> --site <site> --email <email> --token-env <VAR>|--token-file <path>|--token-keychain <ref>
+    [--cloud-id <id>] [--project <key>] [--board <id>] [--default]
+  remove <id>                  Remove an account
+  default <id>                 Select the default account
+  import --from <acli|jira-cli> [--path <path>] [--token-env <VAR>]
+flags:
+  --tui                        Show the human accounts dashboard
+  --once                       Print one dashboard frame
+  --refresh <duration>         Refresh interval, 30s to 24h
+examples:
+  jra-axi accounts list
+  jra-axi accounts --tui --once
+`;
+
 function usage(message: string, suggestions: string[] = []): AxiError {
   return new AxiError(message, "VALIDATION_ERROR", suggestions);
 }

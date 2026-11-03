@@ -95,6 +95,95 @@ async function expectUsage(
   throw new Error("expected usage error");
 }
 
+describe("issues history", () => {
+  it("pages all changes with author identity, time, and raw and display values", async () => {
+    const entry = {
+      id: "1",
+      author: { displayName: "Taylor", accountId: "user-1" },
+      created: "2026-11-03T10:00:00Z",
+      items: [
+        {
+          field: "status",
+          fieldId: "status",
+          from: "1",
+          fromString: "Open",
+          to: "2",
+          toString: "Cancelled",
+        },
+        { field: "assignee", from: null, to: "user-1" },
+      ],
+    };
+    const { deps, calls } = createDeps([
+      {
+        path: "/issue/AXI-1/changelog",
+        body: { values: [entry], total: 2, isLast: false },
+      },
+      {
+        path: "/issue/AXI-1/changelog",
+        body: { values: [{ id: "2", items: [] }], total: 2, isLast: true },
+      },
+    ]);
+    const result = await issuesCommand(
+      ["history", "AXI-1", "--account", "work"],
+      deps,
+    );
+    expect(result).toMatchObject({
+      account: "work",
+      issue: "AXI-1",
+      count: 2,
+      history: [
+        {
+          id: "1",
+          author: "Taylor",
+          authorAccountId: "user-1",
+          created: entry.created,
+          items: [
+            entry.items[0],
+            {
+              field: "assignee",
+              from: null,
+              fromString: null,
+              to: "user-1",
+              toString: null,
+            },
+          ],
+        },
+        { id: "2", author: null, authorAccountId: null, items: [] },
+      ],
+    });
+    expect(calls.map((call) => call.query)).toEqual([
+      { startAt: "0", maxResults: "100" },
+      { startAt: "1", maxResults: "100" },
+    ]);
+    expect(calls.every((call) => call.method === "GET")).toBe(true);
+  });
+
+  it("returns an empty history without fetching more pages", async () => {
+    const { deps, calls } = createDeps([
+      { path: "/issue/AXI-1/changelog", body: { values: [], total: 0 } },
+    ]);
+    expect(await issuesCommand(["history", "AXI-1"], deps)).toEqual({
+      account: "work",
+      issue: "AXI-1",
+      count: 0,
+      history: [],
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("validates keys, extra arguments, and flags before reading Jira", async () => {
+    const { deps, calls } = createDeps([]);
+    await expectUsage(["history"], deps, /key is required/);
+    await expectUsage(
+      ["history", "AXI-1", "extra"],
+      deps,
+      /Unexpected argument/,
+    );
+    await expectUsage(["history", "AXI-1", "--bogus"], deps, /Unknown flag/);
+    expect(calls).toHaveLength(0);
+  });
+});
+
 describe("issues list", () => {
   it("lists issues with the default schema and approximate count", async () => {
     const { deps, calls } = createDeps([

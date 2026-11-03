@@ -35,17 +35,14 @@ describe("projects", () => {
       ["list"],
       commandOptions(async (input) => {
         urls.push(String(input));
-        return response({
-          values: [
-            {
-              id: "100",
-              key: "AXI",
-              name: "Jira AXI",
-              projectTypeKey: "software",
-            },
-          ],
-          isLast: true,
-        });
+        return response([
+          {
+            id: "100",
+            key: "AXI",
+            name: "Jira AXI",
+            projectTypeKey: "software",
+          },
+        ]);
       }),
     );
     expect(output).toMatchObject({
@@ -61,7 +58,7 @@ describe("projects", () => {
   it("names the account when no projects exist", async () => {
     const output = await projectsCommand(
       ["list"],
-      commandOptions(async () => response({ values: [], isLast: true })),
+      commandOptions(async () => response([])),
     );
     expect(output).toMatchObject({
       account: "work",

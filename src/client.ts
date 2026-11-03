@@ -22,12 +22,14 @@ export class JiraClient {
   private readonly token: string;
   private readonly fetcher: FetchLike;
   private readonly sleep: (milliseconds: number) => Promise<void>;
+  private readonly timeoutMs: number;
 
   constructor(
     account: Account,
     token: string,
     options: {
       fetcher?: FetchLike;
+      timeoutMs?: number;
       sleep?: (milliseconds: number) => Promise<void>;
     } = {},
   ) {
@@ -39,6 +41,17 @@ export class JiraClient {
         ["Use a Jira Cloud account URL"],
       );
     }
+    this.timeoutMs =
+      options.timeoutMs ?? Number(process.env.JRA_AXI_TIMEOUT_MS ?? 30_000);
+    if (
+      !Number.isSafeInteger(this.timeoutMs) ||
+      this.timeoutMs < 1 ||
+      this.timeoutMs > 2_147_483_647
+    )
+      throw new AxiError(
+        "Request timeout must be a positive integer in milliseconds (maximum 2147483647)",
+        "VALIDATION_ERROR",
+      );
     this.account = account;
     this.token = token;
     this.fetcher = options.fetcher ?? fetch;
@@ -63,55 +76,72 @@ export class JiraClient {
     const api = options.api ?? "rest";
     let scoped = false;
     for (let attempt = 0; attempt < 4; attempt++) {
-      const response = await this.fetcher(
-        this.url(path, api, scoped, options.query),
-        {
-          method: options.method ?? "GET",
-          headers: {
-            Accept: "application/json",
-            Authorization: `Basic ${Buffer.from(`${this.account.email}:${this.token}`).toString("base64")}`,
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+      try {
+        const response = await this.fetcher(
+          this.url(path, api, scoped, options.query),
+          {
+            signal: controller.signal,
+            method: options.method ?? "GET",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Basic ${Buffer.from(`${this.account.email}:${this.token}`).toString("base64")}`,
+              ...(options.multipart
+                ? { "X-Atlassian-Token": "no-check" }
+                : options.body === undefined
+                  ? {}
+                  : { "Content-Type": "application/json" }),
+            },
             ...(options.multipart
-              ? { "X-Atlassian-Token": "no-check" }
+              ? { body: options.multipart }
               : options.body === undefined
                 ? {}
-                : { "Content-Type": "application/json" }),
+                : { body: JSON.stringify(options.body) }),
           },
-          ...(options.multipart
-            ? { body: options.multipart }
-            : options.body === undefined
-              ? {}
-              : { body: JSON.stringify(options.body) }),
-        },
-      );
-      if (response.status === 401 && !scoped && this.account.cloudId) {
-        scoped = true;
-        continue;
-      }
-      if (response.status === 401 && !scoped && !this.account.cloudId) {
-        throw new JiraClientError(
-          "Jira rejected this token. It may be a scoped token with missing cloudId",
-          ["Set cloudId on this account, then retry"],
         );
+        if (response.status === 401 && !scoped && this.account.cloudId) {
+          scoped = true;
+          continue;
+        }
+        if (response.status === 401 && !scoped && !this.account.cloudId) {
+          throw new JiraClientError(
+            "Jira rejected this token. It may be a scoped token with missing cloudId",
+            ["Set cloudId on this account, then retry"],
+          );
+        }
+        if (response.status === 429 && attempt < 3) {
+          const retryAfter = Number(response.headers.get("retry-after"));
+          await this.sleep(
+            Math.min(
+              Number.isFinite(retryAfter) && retryAfter > 0
+                ? retryAfter * 1000
+                : 500 * 2 ** attempt,
+              10_000,
+            ),
+          );
+          continue;
+        }
+        if (response.status === 429)
+          throw new JiraClientError(`Jira rate limited ${path}`, [
+            "Wait and retry this command",
+          ]);
+        if (!response.ok) throw await this.errorFor(response, path);
+        if (response.status === 204) return undefined;
+        return await response.json();
+      } catch (error) {
+        if (controller.signal.aborted)
+          throw new AxiError(
+            `Jira request timed out after ${this.timeoutMs}ms for ${path}`,
+            "JIRA_TIMEOUT",
+            [
+              "Retry read-only commands. Before retrying a write, check whether Jira applied it.",
+            ],
+          );
+        throw error;
+      } finally {
+        clearTimeout(timer);
       }
-      if (response.status === 429 && attempt < 3) {
-        const retryAfter = Number(response.headers.get("retry-after"));
-        await this.sleep(
-          Math.min(
-            Number.isFinite(retryAfter) && retryAfter > 0
-              ? retryAfter * 1000
-              : 500 * 2 ** attempt,
-            10_000,
-          ),
-        );
-        continue;
-      }
-      if (response.status === 429)
-        throw new JiraClientError(`Jira rate limited ${path}`, [
-          "Wait and retry this command",
-        ]);
-      if (!response.ok) throw await this.errorFor(response, path);
-      if (response.status === 204) return undefined;
-      return response.json();
     }
     throw new JiraClientError(`Jira request failed for ${path}`);
   }
@@ -171,7 +201,8 @@ export class JiraClient {
       const page = (await this.request(path, {
         api,
         query: { ...query, startAt, maxResults },
-      })) as { values?: T[]; isLast?: boolean; total?: number };
+      })) as T[] | { values?: T[]; isLast?: boolean; total?: number };
+      if (Array.isArray(page)) return [...values, ...page];
       const pageValues = page.values ?? [];
       values.push(...pageValues);
       if (
